@@ -60,8 +60,6 @@ def parse_brief(response_text, as_of):
     text = response_text
     if "```json" in text:
         text = text.split("```json", 1)[1].split("```", 1)[0]
-    elif "```" in text:
-        text = text.split("```", 1)[1].split("```", 1)[0]
     start, end = text.find("{"), text.rfind("}")
     payload = json.loads(text[start:end + 1])
     items = [BriefItem(title=i.get("title", ""), thesis=i.get("thesis", ""),
@@ -89,5 +87,5 @@ def generate_brief(signal_set, portfolio_context, interests, settings, _client=N
         messages=[{"role": "user", "content": prompt}],
     ) as stream:
         msg = stream.get_final_message()
-    text = "".join(b.text for b in msg.content if getattr(b, "type", None) == "text")
+    text = "".join(getattr(b, "text", "") or "" for b in msg.content if getattr(b, "type", None) == "text")
     return parse_brief(text, as_of=signal_set.as_of)

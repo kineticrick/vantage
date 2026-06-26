@@ -36,3 +36,12 @@ def test_parse_brief_reads_model_json():
     assert brief.items[0].title == "Memory boom"
     assert brief.challenge == "You sold WDC early."
     assert "not financial advice" in brief.disclaimer.lower()
+
+def test_parse_brief_reads_bare_json_no_fence():
+    payload = {"executive_summary": "s", "items": [], "watchlist": [],
+               "challenge": "c", "what_im_missing": "m"}
+    text = "Here is the brief: " + json.dumps(payload) + " done."
+    brief = parse_brief(text, as_of="2026-06-26")
+    assert brief.executive_summary == "s"
+    assert brief.challenge == "c"
+    assert "not financial advice" in brief.disclaimer.lower()
