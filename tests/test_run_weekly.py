@@ -46,3 +46,28 @@ def test_run_weekly_orchestrates(tmp_path):
     assert (s.data_dir / "signals-2026-06-26.json").exists()
     assert "Weekly Brief" in sent["subject"]
     assert "Not financial advice" in sent["html"]
+
+def test_run_weekly_handles_missing_interests_yaml(tmp_path):
+    s = _settings(tmp_path)
+    (s.config_dir / "interests.yaml").unlink()  # file absent
+    idx = pd.date_range("2025-06-01", periods=260, freq="D")
+    md = MarketData(as_of="2026-06-26",
+                    prices={"AAPL": pd.Series([100.0 + i for i in range(260)], index=idx)},
+                    volumes={"AAPL": pd.Series([1000.0] * 260, index=idx)},
+                    sectors={"AAPL": "Technology"})
+    pc = PortfolioContext(available=True, holdings=[], sector_concentration={},
+                          asset_type_concentration={}, revealed_interests=[], note="")
+    brief = Brief(as_of="2026-06-26", executive_summary="s",
+                  items=[BriefItem(title="t", thesis="x", evidence="x",
+                                   sources=[], why_it_matters="x",
+                                   portfolio_relevance="x")],
+                  watchlist=[], challenge="c", what_im_missing="m",
+                  disclaimer="Not financial advice.")
+    path = run_weekly.run(
+        settings=s,
+        _market_data_fn=lambda tickers, cache_dir: md,
+        _portfolio_fn=lambda pa_path: pc,
+        _analyst_fn=lambda ss, pcx, interests, st: brief,
+        _send_fn=lambda subject, html, st: None,
+    )
+    assert Path(path).exists()
