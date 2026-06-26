@@ -20,11 +20,14 @@ def _settings():
 
 def test_send_email_builds_and_sends():
     _FakeSMTP.sent.clear()
+    fake = _FakeSMTP()
     send_email("Weekly Brief", "<html><body>hi</body></html>", _settings(),
-               _smtp_factory=lambda: _FakeSMTP())
+               _smtp_factory=lambda: fake)
     assert len(_FakeSMTP.sent) == 1
     msg = _FakeSMTP.sent[0]
+    assert msg["From"] == "me@gmail.com"
     assert msg["To"] == "you@gmail.com"
     assert msg["Subject"] == "Weekly Brief"
+    assert fake.logged_in == ("me@gmail.com", "pw")
     html_part = msg.get_body(preferencelist=("html",))
     assert "hi" in html_part.get_content()
