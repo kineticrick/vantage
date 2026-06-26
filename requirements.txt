@@ -1,0 +1,6 @@
+anthropic>=0.40
+yfinance>=0.2.50
+pandas>=2.0
+PyYAML>=6.0
+python-dotenv>=1.0
+pytest>=8.0

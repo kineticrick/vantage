@@ -1,0 +1,11 @@
+# Hand-written interest overlay: themes you care about but may not (yet) hold.
+themes:
+  - artificial intelligence infrastructure
+  - semiconductors and memory
+  - energy transition
+sectors_of_interest:
+  - Technology
+  - Energy
+risk_appetite: moderate
+notes: >
+  Free-text guidance for the analyst about what you care about and how you think.

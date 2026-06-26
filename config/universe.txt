@@ -1,0 +1,7 @@
+# Ticker universe — one symbol per line. Lines starting with '#' are comments.
+# Expanded from index constituents; see README.
+AAPL
+MSFT
+NVDA
+MU
+WDC
