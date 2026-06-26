@@ -19,6 +19,19 @@ def test_render_markdown_contains_sections():
 def test_render_html_is_html():
     html = render_html(_brief())
     assert "<html" in html.lower() and "Memory boom" in html
+    assert "Not financial advice" in html
+    assert "Challenge" in html and "Watchlist" in html and "NVDA" in html
+    assert "executive summary" in html.lower()
+
+def test_render_html_escapes_and_sanitizes_links():
+    b = _brief()
+    b.items[0].title = "<script>alert(1)</script>"
+    b.items[0].sources = ["javascript:alert(1)", "https://ok.com/a?b=1&c=2"]
+    html = render_html(b)
+    assert "<script>alert(1)</script>" not in html
+    assert "&lt;script&gt;" in html
+    assert 'href="javascript:' not in html
+    assert '<a href="https://ok.com' in html
 
 def test_save_markdown_writes_dated_file(tmp_path):
     p = save_markdown(_brief(), tmp_path)
