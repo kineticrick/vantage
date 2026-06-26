@@ -33,23 +33,22 @@ def load_portfolio_context(pa_path: str, _loader=None) -> PortfolioContext:
     loader = _loader or _real_loader
     try:
         raw = loader(pa_path)
+        holdings = [Holding(**h) for h in raw["holdings"]]
+        sector_conc, type_conc = {}, {}
+        for h in holdings:
+            if h.pct_of_portfolio and h.sector:
+                sector_conc[h.sector] = sector_conc.get(h.sector, 0.0) + h.pct_of_portfolio
+        total_val = sum((h.current_value or 0) for h in holdings) or 1.0
+        for h in holdings:
+            if h.asset_type:
+                type_conc[h.asset_type] = type_conc.get(h.asset_type, 0.0) + (h.current_value or 0) / total_val
+        return PortfolioContext(
+            available=True,
+            holdings=holdings,
+            sector_concentration=sector_conc,
+            asset_type_concentration=type_conc,
+            revealed_interests=raw.get("revealed_interests", []),
+            note="",
+        )
     except Exception as e:  # graceful degradation
         return PortfolioContext(available=False, note=str(e))
-
-    holdings = [Holding(**h) for h in raw["holdings"]]
-    sector_conc, type_conc = {}, {}
-    for h in holdings:
-        if h.pct_of_portfolio:
-            sector_conc[h.sector] = sector_conc.get(h.sector, 0.0) + h.pct_of_portfolio
-    total_val = sum((h.current_value or 0) for h in holdings) or 1.0
-    for h in holdings:
-        if h.asset_type:
-            type_conc[h.asset_type] = type_conc.get(h.asset_type, 0.0) + (h.current_value or 0) / total_val
-    return PortfolioContext(
-        available=True,
-        holdings=holdings,
-        sector_concentration=sector_conc,
-        asset_type_concentration=type_conc,
-        revealed_interests=raw.get("revealed_interests", []),
-        note="",
-    )

@@ -26,3 +26,11 @@ def test_load_portfolio_context_degrades_on_error():
         raise RuntimeError("db down")
     pc = load_portfolio_context("/unused", _loader=boom)
     assert pc.available is False and "db down" in pc.note
+
+def test_load_portfolio_context_degrades_on_malformed_holding():
+    def bad_holdings(pa_path):
+        return {"holdings": [{"ticker": "AAPL", "unexpected_field": 1}],
+                "revealed_interests": []}
+    pc = load_portfolio_context("/unused", _loader=bad_holdings)
+    assert pc.available is False
+    assert pc.note  # carries the error reason
