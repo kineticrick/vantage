@@ -51,4 +51,4 @@ def load_portfolio_context(pa_path: str, _loader=None) -> PortfolioContext:
             note="",
         )
     except Exception as e:  # graceful degradation
-        return PortfolioContext(available=False, note=str(e))
+        return PortfolioContext(available=False, note=str(e)[:200])

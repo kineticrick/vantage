@@ -61,6 +61,8 @@ def parse_brief(response_text, as_of):
     if "```json" in text:
         text = text.split("```json", 1)[1].split("```", 1)[0]
     start, end = text.find("{"), text.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("Analyst response contained no JSON object")
     payload = json.loads(text[start:end + 1])
     items = [BriefItem(title=i.get("title", ""), thesis=i.get("thesis", ""),
                        evidence=i.get("evidence", ""), sources=i.get("sources", []),

@@ -38,3 +38,25 @@ def test_fetch_market_data_caches(tmp_path):
                             _downloader=counting_download, _sector_fn=_fake_sector)
     assert calls["n"] == 1  # second run served from cache
     assert len(md2.prices["AAPL"]) == 5
+
+def test_fetch_market_data_caches_sectors(tmp_path):
+    calls = {"n": 0}
+    def counting_sector(t):
+        calls["n"] += 1
+        return "Technology"
+    fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                      _downloader=_fake_download, _sector_fn=counting_sector)
+    fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                      _downloader=_fake_download, _sector_fn=counting_sector)
+    assert calls["n"] == 1  # sectors served from sidecar on the second run
+
+def test_fetch_market_data_handles_flat_columns(tmp_path):
+    import pandas as pd
+    idx = pd.date_range("2025-06-01", periods=5, freq="D")
+    flat = pd.DataFrame({"Close": [100.0 + i for i in range(5)],
+                         "Volume": [1000.0] * 5}, index=idx)
+    md = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                           _downloader=lambda tickers, period: flat,
+                           _sector_fn=_fake_sector)
+    assert len(md.prices["AAPL"]) == 5
+    assert md.volumes["AAPL"].iloc[0] == 1000.0

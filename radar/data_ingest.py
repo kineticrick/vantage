@@ -1,8 +1,12 @@
 import hashlib
+import json
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class MarketData:
@@ -30,6 +34,11 @@ def _batch_cache_path(cache_dir, batch, period):
     ).hexdigest()[:16]
     return Path(cache_dir) / f"batch_{key}.parquet"
 
+def _extract_series(df, field, ticker):
+    if isinstance(df.columns, pd.MultiIndex):
+        return df[(field, ticker)].dropna()
+    return df[field].dropna()
+
 def fetch_market_data(tickers, cache_dir, batch_size=100, period="1y",
                       _downloader=None, _sector_fn=None) -> MarketData:
     downloader = _downloader or _default_downloader
@@ -39,19 +48,29 @@ def fetch_market_data(tickers, cache_dir, batch_size=100, period="1y",
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i:i + batch_size]
         cpath = _batch_cache_path(cache_dir, batch, period)
+        spath = cpath.with_name(cpath.stem + ".sectors.json")
         if cpath.exists():
             df = pd.read_parquet(cpath)
+            batch_sectors = json.loads(spath.read_text()) if spath.exists() else {}
         else:
             df = downloader(batch, period)
             df.to_parquet(cpath)
+            batch_sectors = {t: sector_fn(t) for t in batch}
+            spath.write_text(json.dumps(batch_sectors))
+        present = 0
         for t in batch:
             try:
-                p = df[("Close", t)].dropna()
-                v = df[("Volume", t)].dropna()
+                p = _extract_series(df, "Close", t)
+                v = _extract_series(df, "Volume", t)
             except KeyError:
+                logger.warning("Ticker %s missing from downloaded frame; skipping", t)
                 continue
             prices[t] = p
             volumes[t] = v
-            sectors[t] = sector_fn(t)
+            sectors[t] = batch_sectors.get(t) or sector_fn(t)
+            present += 1
+        logger.info("Batch %d: %d/%d tickers loaded", i // batch_size, present, len(batch))
+    if not prices:
+        logger.warning("fetch_market_data produced no price series (empty MarketData)")
     return MarketData(as_of=date.today().isoformat(),
                       prices=prices, volumes=volumes, sectors=sectors)

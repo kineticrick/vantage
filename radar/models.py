@@ -68,6 +68,8 @@ class PortfolioContext:
             lines.append(f"  {h.ticker} ({h.name}) — {pct} of portfolio, sector {h.sector}")
         lines.append("Sector concentration: " + ", ".join(
             f"{k} {v:.0%}" for k, v in self.sector_concentration.items()))
+        lines.append("Asset-type concentration: " + ", ".join(
+            f"{k} {v:.0%}" for k, v in self.asset_type_concentration.items()))
         lines.append("Revealed interests (where capital has gone): " +
                      ", ".join(self.revealed_interests))
         return "\n".join(lines)

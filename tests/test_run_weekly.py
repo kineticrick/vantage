@@ -47,6 +47,29 @@ def test_run_weekly_orchestrates(tmp_path):
     assert "Weekly Brief" in sent["subject"]
     assert "Not financial advice" in sent["html"]
 
+def test_run_weekly_degrades_when_analyst_fails(tmp_path):
+    s = _settings(tmp_path)
+    idx = pd.date_range("2025-06-01", periods=260, freq="D")
+    md = MarketData(as_of="2026-06-26",
+                    prices={"AAPL": pd.Series([100.0 + i for i in range(260)], index=idx)},
+                    volumes={"AAPL": pd.Series([1000.0] * 260, index=idx)},
+                    sectors={"AAPL": "Technology"})
+    pc = PortfolioContext(available=True, holdings=[], sector_concentration={},
+                          asset_type_concentration={}, revealed_interests=[], note="")
+    def boom(ss, pcx, interests, st):
+        raise RuntimeError("api exploded")
+    sent = {}
+    path = run_weekly.run(
+        settings=s,
+        _market_data_fn=lambda tickers, cache_dir: md,
+        _portfolio_fn=lambda pa_path: pc,
+        _analyst_fn=boom,
+        _send_fn=lambda subject, html, st: sent.update({"html": html}),
+    )
+    assert Path(path).exists()
+    assert "not financial advice" in sent["html"].lower()
+    assert "fallback" in sent["html"].lower()
+
 def test_run_weekly_handles_missing_interests_yaml(tmp_path):
     s = _settings(tmp_path)
     (s.config_dir / "interests.yaml").unlink()  # file absent

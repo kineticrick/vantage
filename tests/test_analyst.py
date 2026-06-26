@@ -45,3 +45,8 @@ def test_parse_brief_reads_bare_json_no_fence():
     assert brief.executive_summary == "s"
     assert brief.challenge == "c"
     assert "not financial advice" in brief.disclaimer.lower()
+
+def test_parse_brief_raises_on_no_json():
+    import pytest
+    with pytest.raises(ValueError):
+        parse_brief("no json object here at all", as_of="2026-06-26")
