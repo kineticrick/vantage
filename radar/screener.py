@@ -1,3 +1,4 @@
+import pandas as pd
 from statistics import mean
 from radar.models import Signal, SignalSet
 
@@ -8,7 +9,7 @@ def _trailing_return(series, lookback):
         return None
     past = series.iloc[-(lookback + 1)]
     last = series.iloc[-1]
-    if past == 0 or past != past:  # zero or NaN
+    if past == 0 or pd.isna(past) or pd.isna(last):
         return None
     return float(last / past - 1.0)
 
@@ -53,7 +54,7 @@ def run_screener(market_data, top_n=25, return_leader_threshold=1.0,
             signals.append(Signal(ticker=ticker, signal_type="volume_spike",
                                   value=vr, rank=0, sector=sector, metrics=metrics))
 
-    signals = signals[:top_n] if top_n else signals
+    signals = signals[:top_n] if top_n is not None else signals
 
     by_sector = {}
     for _, sector, metrics in rows:

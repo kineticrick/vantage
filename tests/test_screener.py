@@ -36,3 +36,12 @@ def test_screener_ranks_by_12m_return():
     ss = run_screener(md, return_leader_threshold=0.1, volume_spike_ratio=99.0)
     leaders = [s for s in ss.signals if s.signal_type == "ret_12m_leader"]
     assert leaders[0].ticker == "BIG" and leaders[0].rank == 1
+
+def test_screener_short_series_emits_no_signals():
+    md = MarketData(as_of="2026-06-26",
+                    prices={"AAA": _series([100.0 + i for i in range(10)])},
+                    volumes={"AAA": _series([1.0] * 10)},
+                    sectors={"AAA": "Tech"})
+    ss = run_screener(md, return_leader_threshold=0.1, volume_spike_ratio=1.0)
+    assert ss.signals == []
+    assert ss.sector_momentum == {}
