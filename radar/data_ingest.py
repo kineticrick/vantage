@@ -46,10 +46,12 @@ def fetch_market_data(tickers, cache_dir, batch_size=100, period="1y",
             df.to_parquet(cpath)
         for t in batch:
             try:
-                prices[t] = df[("Close", t)].dropna()
-                volumes[t] = df[("Volume", t)].dropna()
+                p = df[("Close", t)].dropna()
+                v = df[("Volume", t)].dropna()
             except KeyError:
                 continue
+            prices[t] = p
+            volumes[t] = v
             sectors[t] = sector_fn(t)
     return MarketData(as_of=date.today().isoformat(),
                       prices=prices, volumes=volumes, sectors=sectors)

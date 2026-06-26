@@ -1,4 +1,5 @@
 # tests/test_data_ingest.py
+from datetime import date
 import pandas as pd
 from radar.data_ingest import fetch_market_data, MarketData
 
@@ -20,6 +21,7 @@ def test_fetch_market_data_builds_series(tmp_path):
     md = fetch_market_data(["AAPL", "MU"], cache_dir=tmp_path, batch_size=2,
                            _downloader=_fake_download, _sector_fn=_fake_sector)
     assert isinstance(md, MarketData)
+    assert md.as_of == date.today().isoformat()
     assert "AAPL" in md.prices and len(md.prices["AAPL"]) == 5
     assert md.prices["AAPL"].iloc[-1] == 104.0
     assert md.volumes["MU"].iloc[0] == 1000.0
@@ -32,6 +34,7 @@ def test_fetch_market_data_caches(tmp_path):
         return _fake_download(tickers, period)
     fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
                       _downloader=counting_download, _sector_fn=_fake_sector)
-    fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
-                      _downloader=counting_download, _sector_fn=_fake_sector)
+    md2 = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                            _downloader=counting_download, _sector_fn=_fake_sector)
     assert calls["n"] == 1  # second run served from cache
+    assert len(md2.prices["AAPL"]) == 5
