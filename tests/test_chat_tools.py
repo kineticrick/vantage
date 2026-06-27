@@ -64,4 +64,4 @@ def test_tool_defs_and_dispatch(tmp_path):
     # dispatch routes to the impl
     out = dispatch("get_ticker_metrics", {"ticker": "MU"}, _settings(tmp_path))
     assert "ticker" in out  # ran (may be error if no network, but routed)
-    assert dispatch("nope", {}, _settings(tmp_path))["error"].startswith("unknown tool")
+    assert dispatch("nope", {}, _settings(tmp_path))["error"].startswith("unknown tool: ")
