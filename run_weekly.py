@@ -58,6 +58,17 @@ def run(settings=None, _market_data_fn=None, _portfolio_fn=None,
     send(subject, html, s)
     return path
 
+def main(argv=None):
+    import sys
+    argv = sys.argv[1:] if argv is None else argv
+    if "--no-email" in argv:
+        out = run(_send_fn=lambda subject, html, st:
+                  logger.info("Dry-run: skipped email (%s)", subject))
+        print(f"[dry-run] Brief written to {out}; email skipped.")
+    else:
+        out = run()
+        print(f"Brief written to {out} and emailed.")
+    return out
+
 if __name__ == "__main__":
-    out = run()
-    print(f"Brief written to {out} and emailed.")
+    main()

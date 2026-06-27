@@ -94,3 +94,20 @@ def test_run_weekly_handles_missing_interests_yaml(tmp_path):
         _send_fn=lambda subject, html, st: None,
     )
     assert Path(path).exists()
+
+def test_main_no_email_uses_skip_send(monkeypatch):
+    captured = {}
+    def fake_run(**kwargs):
+        captured.update(kwargs)
+        return Path("/tmp/brief.md")
+    monkeypatch.setattr(run_weekly, "run", fake_run)
+
+    # --no-email passes a _send_fn that does not raise and sends nothing
+    run_weekly.main(["--no-email"])
+    assert "_send_fn" in captured
+    captured["_send_fn"]("subj", "<html>", None)  # no-op, must not raise
+
+    # default (no flag) passes no _send_fn override → real emailing path
+    captured.clear()
+    run_weekly.main([])
+    assert "_send_fn" not in captured

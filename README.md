@@ -18,6 +18,7 @@ deliberately challenging) brief. Research aid — **not financial advice**.
 
 ## Run
 - Weekly digest (full pipeline): `python run_weekly.py`
+- Dry run (full real pipeline, writes the brief to `reports/` instead of emailing): `python run_weekly.py --no-email`
 - Tests: `python -m pytest -v`
 
 ## Schedule (cron)
