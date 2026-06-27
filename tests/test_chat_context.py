@@ -45,3 +45,14 @@ def test_load_chat_context_graceful_when_missing(tmp_path):
     assert ctx.signals is None and ctx.brief is None and ctx.interests == {}
     text = ctx.render()
     assert "unavailable" in text.lower() or "no " in text.lower()  # notes the gaps
+
+def test_load_chat_context_survives_corrupt_files(tmp_path):
+    s = _settings(tmp_path)
+    (s.config_dir / "interests.yaml").write_text("!!invalid: yaml: [")
+    (s.data_dir / "signals-2026-06-27.json").write_text("{not valid json")
+    (s.reports_dir / "brief-2026-06-27.json").write_text("{not valid json")
+    ctx = load_chat_context(s, _portfolio_fn=lambda pa: _pc())
+    assert ctx.interests == {}
+    assert ctx.signals is None
+    assert ctx.brief is None
+    assert ctx.render()  # must not raise

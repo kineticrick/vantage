@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 import yaml
-from radar.models import SignalSet, Brief
+from radar.models import SignalSet, Brief, PortfolioContext
 from radar.portfolio_context import load_portfolio_context
 
 def _newest(directory, pattern):
@@ -45,7 +45,6 @@ def load_chat_context(settings, _portfolio_fn=None) -> ChatContext:
     try:
         portfolio = pf(settings.portfolio_analysis_path)
     except Exception as e:
-        from radar.models import PortfolioContext
         portfolio = PortfolioContext(available=False, note=str(e)[:200])
 
     signals = None
@@ -59,7 +58,10 @@ def load_chat_context(settings, _portfolio_fn=None) -> ChatContext:
     interests = {}
     ipath = settings.config_dir / "interests.yaml"
     if ipath.exists():
-        interests = yaml.safe_load(ipath.read_text()) or {}
+        try:
+            interests = yaml.safe_load(ipath.read_text()) or {}
+        except Exception:
+            interests = {}
 
     brief = None
     brief_file = _newest(settings.reports_dir, "brief-*.json")
