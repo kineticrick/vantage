@@ -43,6 +43,9 @@ def test_run_weekly_orchestrates(tmp_path):
         _send_fn=lambda subject, html, st: sent.update({"subject": subject, "html": html}),
     )
     assert Path(path).exists()
+    # the pipeline persists md + html + json for every report
+    assert (s.reports_dir / "brief-2026-06-26.html").exists()
+    assert (s.reports_dir / "brief-2026-06-26.json").exists()
     assert (s.data_dir / "signals-2026-06-26.json").exists()
     assert "Weekly Brief" in sent["subject"]
     assert "Not financial advice" in sent["html"]

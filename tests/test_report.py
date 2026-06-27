@@ -1,5 +1,6 @@
 from radar.models import Brief, BriefItem
-from radar.report import render_markdown, render_html, save_markdown
+from radar.report import (render_markdown, render_html, save_markdown,
+                          save_html, save_brief_json, save_report)
 
 def _brief():
     return Brief(as_of="2026-06-26", executive_summary="Big week.",
@@ -36,3 +37,22 @@ def test_render_html_escapes_and_sanitizes_links():
 def test_save_markdown_writes_dated_file(tmp_path):
     p = save_markdown(_brief(), tmp_path)
     assert p.exists() and p.name == "brief-2026-06-26.md"
+
+def test_save_html_writes_dated_file(tmp_path):
+    p = save_html(_brief(), tmp_path)
+    assert p.exists() and p.name == "brief-2026-06-26.html"
+    assert "<html" in p.read_text().lower() and "Memory boom" in p.read_text()
+
+def test_save_brief_json_roundtrips(tmp_path):
+    p = save_brief_json(_brief(), tmp_path)
+    assert p.exists() and p.name == "brief-2026-06-26.json"
+    import json
+    restored = Brief.from_dict(json.loads(p.read_text()))
+    assert restored.items[0].title == "Memory boom"
+    assert restored.challenge == "You exited WDC too early."
+
+def test_save_report_writes_all_three(tmp_path):
+    md_path = save_report(_brief(), tmp_path)
+    assert md_path.name == "brief-2026-06-26.md"
+    for ext in ("md", "html", "json"):
+        assert (tmp_path / f"brief-2026-06-26.{ext}").exists()

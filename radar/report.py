@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from html import escape
 
@@ -54,3 +55,23 @@ def save_markdown(brief, reports_dir) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(render_markdown(brief), encoding="utf-8")
     return path
+
+def save_html(brief, reports_dir) -> Path:
+    path = Path(reports_dir) / f"brief-{brief.as_of}.html"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_html(brief), encoding="utf-8")
+    return path
+
+def save_brief_json(brief, reports_dir) -> Path:
+    # Persist the structured Brief so any report can be re-rendered later.
+    path = Path(reports_dir) / f"brief-{brief.as_of}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(brief.to_dict(), indent=2), encoding="utf-8")
+    return path
+
+def save_report(brief, reports_dir) -> Path:
+    """Write the brief as Markdown, HTML, and JSON. Return the Markdown path."""
+    md_path = save_markdown(brief, reports_dir)
+    save_html(brief, reports_dir)
+    save_brief_json(brief, reports_dir)
+    return md_path

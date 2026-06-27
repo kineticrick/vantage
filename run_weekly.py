@@ -7,7 +7,7 @@ from radar.data_ingest import fetch_market_data
 from radar.screener import run_screener
 from radar.portfolio_context import load_portfolio_context
 from radar.analyst import generate_brief
-from radar.report import save_markdown, render_html
+from radar.report import save_report, render_html
 from radar.deliver import send_email
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ def run(settings=None, _market_data_fn=None, _portfolio_fn=None,
         logger.warning("Analyst step failed: %s — sending fallback brief", e)
         brief = _fallback_brief(signal_set, str(e))
 
-    path = save_markdown(brief, s.reports_dir)
+    path = save_report(brief, s.reports_dir)  # writes .md, .html, .json
     html = render_html(brief)
     subject = f"Blind-Spot Radar — Weekly Brief ({brief.as_of})"
     send = _send_fn or (lambda subject, html, st: send_email(subject, html, st))
