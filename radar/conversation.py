@@ -10,6 +10,8 @@ _TOOL_NOTE = ("\n\nYou have two tools for exact figures: get_ticker_metrics(tick
               "web_search for news. Keep the conversation grounded and challenge the "
               "user's reasoning where the evidence warrants.\n\n")
 
+_MAX_CONTINUATIONS = 10
+
 class Conversation:
     def __init__(self, settings, _client=None, _context=None):
         self.settings = settings
@@ -29,7 +31,13 @@ class Conversation:
         self.messages.append({"role": "user", "content": user_message})
         client = self._client_or_default()
         tools = [_WEB_SEARCH_TOOL] + TOOL_DEFINITIONS
+        steps = 0
         while True:
+            steps += 1
+            if steps > _MAX_CONTINUATIONS:
+                yield {"type": "error",
+                       "message": f"tool loop exceeded {_MAX_CONTINUATIONS} steps"}
+                break
             try:
                 with client.messages.stream(
                     model=self.settings.model, max_tokens=64000,
@@ -41,7 +49,9 @@ class Conversation:
                                 and getattr(event.delta, "type", None) == "text_delta"):
                             yield {"type": "text", "text": event.delta.text}
                     final = stream.get_final_message()
-            except Exception as e:  # API/stream failure — surface and end cleanly
+            except Exception as e:  # API/stream failure — surface, balance history, end
+                # answer the dangling user turn so history stays valid for the next send()
+                self.messages.append({"role": "assistant", "content": f"[error: {e}]"})
                 yield {"type": "error", "message": str(e)}
                 break
 
@@ -55,7 +65,7 @@ class Conversation:
                 for call in custom_calls:
                     yield {"type": "tool_use", "name": call.name, "input": dict(call.input)}
                     out = dispatch(call.name, call.input, self.settings)
-                    is_err = "error" in out
+                    is_err = out.get("error") is not None
                     if is_err:
                         yield {"type": "error", "message": out["error"]}
                     results.append({"type": "tool_result", "tool_use_id": call.id,

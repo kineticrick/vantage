@@ -83,3 +83,31 @@ def test_system_prompt_has_persona_context_and_disclaimer():
     assert "AAPL 50%" in conv.system                  # rendered context
     assert "not financial advice" in conv.system.lower()  # disclaimer
     assert "get_ticker_metrics" in conv.system        # tool note
+
+def test_send_bounds_runaway_tool_loop(monkeypatch):
+    import radar.conversation as cm
+    monkeypatch.setattr(cm, "dispatch", lambda *a: {"ok": 1})
+    # every turn asks for a custom tool again -> would loop forever without a bound
+    forever = [(_final([_text("")], "tool_use"), [])  # but needs a custom tool_use block
+               ]
+    # build a client whose stream() always returns a custom-tool turn
+    import types
+    def _tool(id_, name, inp):
+        return types.SimpleNamespace(type="tool_use", id=id_, name=name, input=inp)
+    class _AlwaysToolMessages:
+        def __init__(self): self.calls = 0
+        def stream(self, **kw):
+            self.calls += 1
+            msg = _final([_tool(f"t{self.calls}", "get_ticker_metrics", {"ticker": "MU"})], "tool_use")
+            class _S:
+                def __enter__(self_): return self_
+                def __exit__(self_, *a): return False
+                def __iter__(self_): return iter(())
+                def get_final_message(self_): return msg
+            return _S()
+    class _AlwaysToolClient:
+        def __init__(self): self.messages = _AlwaysToolMessages()
+    conv = Conversation(_settings(), _client=_AlwaysToolClient(), _context=_Ctx())
+    events = list(conv.send("loop?"))
+    assert any(e["type"] == "error" and "exceeded" in e["message"] for e in events)
+    assert events[-1]["type"] == "done"

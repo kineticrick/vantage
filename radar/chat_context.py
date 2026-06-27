@@ -24,8 +24,9 @@ class ChatContext:
             note = getattr(self.portfolio, "note", "") if self.portfolio else ""
             parts.append(f"Portfolio: unavailable ({note}).")
         if self.signals is not None:
-            leaders = ", ".join(f"{s.ticker}({s.value:.2f})" for s in self.signals.signals
-                                if s.signal_type == "ret_12m_leader")[:800]
+            leader_items = [f"{s.ticker}({s.value:.2f})" for s in self.signals.signals
+                            if s.signal_type == "ret_12m_leader"]
+            leaders = ", ".join(leader_items[:40])
             mom = ", ".join(f"{k} {v:+.0%}" for k, v in self.signals.sector_momentum.items())
             parts.append(f"Latest signals ({self.signals.as_of}): 12mo leaders: "
                          f"{leaders or 'none'}. Sector momentum: {mom or 'none'}.")
