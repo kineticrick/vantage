@@ -60,3 +60,32 @@ def test_fetch_market_data_handles_flat_columns(tmp_path):
                            _sector_fn=_fake_sector)
     assert len(md.prices["AAPL"]) == 5
     assert md.volumes["AAPL"].iloc[0] == 1000.0
+
+def test_sector_cache_is_long_lived_across_price_refresh(tmp_path):
+    # A fresh sector entry is reused even when the price cache misses
+    # (a different period yields a different parquet key). The old per-batch
+    # sidecar would have re-fetched here; the long-lived cache must not.
+    calls = {"n": 0}
+    def counting_sector(t):
+        calls["n"] += 1
+        return "Technology"
+    fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1, period="1y",
+                      _downloader=_fake_download, _sector_fn=counting_sector)
+    fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1, period="6mo",
+                      _downloader=_fake_download, _sector_fn=counting_sector)
+    assert calls["n"] == 1  # sector not re-fetched despite a fresh price download
+
+def test_sector_cache_refetches_when_stale(tmp_path):
+    import json
+    from datetime import date, timedelta
+    old = (date.today() - timedelta(days=40)).isoformat()
+    (tmp_path / "sectors.json").write_text(
+        json.dumps({"AAPL": {"sector": "OldSector", "fetched": old}}))
+    calls = {"n": 0}
+    def counting_sector(t):
+        calls["n"] += 1
+        return "Technology"
+    md = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                           _downloader=_fake_download, _sector_fn=counting_sector)
+    assert calls["n"] == 1                  # stale entry -> re-fetched
+    assert md.sectors["AAPL"] == "Technology"
