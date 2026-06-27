@@ -89,3 +89,12 @@ def test_sector_cache_refetches_when_stale(tmp_path):
                            _downloader=_fake_download, _sector_fn=counting_sector)
     assert calls["n"] == 1                  # stale entry -> re-fetched
     assert md.sectors["AAPL"] == "Technology"
+
+def test_fetch_default_period_exceeds_12mo_window():
+    # Regression guard: data_ingest must fetch MORE than 252 trading sessions so
+    # the screener's 12-month (252-day) lookback can compute. "1y" (~252
+    # sessions) is one session too short and silently yields no 12mo leaders.
+    import inspect
+    default = inspect.signature(fetch_market_data).parameters["period"].default
+    assert default not in ("1y", "ytd", "6mo", "3mo", "1mo"), \
+        f"period {default!r} too short for the 252-day screener window"

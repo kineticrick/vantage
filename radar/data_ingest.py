@@ -72,8 +72,11 @@ def _sector_for(ticker, cache, sector_fn, today):
     cache[ticker] = {"sector": sector, "fetched": today.isoformat()}
     return sector
 
-def fetch_market_data(tickers, cache_dir, batch_size=100, period="1y",
+def fetch_market_data(tickers, cache_dir, batch_size=100, period="2y",
                       _downloader=None, _sector_fn=None) -> MarketData:
+    # period must exceed the screener's longest lookback (252 trading days for
+    # the 12-month return). "1y" (~252 sessions) is one session too short and
+    # silently yields no 12mo leaders / empty sector momentum — keep >= "2y".
     downloader = _downloader or _default_downloader
     sector_fn = _sector_fn or _default_sector_fn
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
