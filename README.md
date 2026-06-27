@@ -9,7 +9,7 @@ deliberately challenging) brief. Research aid — **not financial advice**.
 2. `pip install -r requirements.txt`
 3. `cp .env.example .env` and fill in `ANTHROPIC_API_KEY`, Gmail credentials
    (use a Gmail **App Password**), and `EMAIL_RECIPIENT`.
-4. Edit `config/universe.txt` (ticker universe) and `config/interests.yaml`
+4. Edit `config/universe.txt` (ticker universe) and `config/interests.yaml` Regenerate the full S&P 500 + Nasdaq-100 + S&P 400 blend with `python tools/build_universe.py` (needs `lxml`).
    (your interest overlay).
 5. Ensure the `portfolio_analysis` codebase is at
    `/home/kineticrick/code/python/portfolio_analysis` (or set
