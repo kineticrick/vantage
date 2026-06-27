@@ -38,3 +38,4 @@ def test_main_exits_on_quit_command(tmp_path):
     lines = iter(["quit", "should-not-be-sent"])
     chat.main(settings=s, _conversation=conv, _input=lambda _prompt: next(lines))
     assert conv.sent == []  # quit before sending anything
+    assert list(s.reports_dir.glob("chat-*.md")) == []  # no transcript on empty session
