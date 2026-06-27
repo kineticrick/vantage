@@ -4,21 +4,23 @@ from radar.models import Holding, PortfolioContext
 def _real_loader(pa_path: str) -> dict:
     if pa_path not in sys.path:
         sys.path.append(pa_path)
-    from libraries.helpers import get_portfolio_current_value, add_asset_info, build_master_log
+    # get_portfolio_current_value() already includes Name/AssetType/Sector/Geography,
+    # so we do NOT call add_asset_info (a second merge would suffix them _x/_y).
+    from libraries.helpers import get_portfolio_current_value, build_master_log
     df, _total = get_portfolio_current_value()
-    df = add_asset_info(df, truncate=True)
     holdings = []
     for _, row in df.iterrows():
         pct = row.get("% Total Portfolio")
         holdings.append({
             "ticker": row.get("Symbol"),
-            "name": row.get("Name", ""),
+            "name": row.get("Name") or "",
             "shares": float(row.get("Quantity", 0) or 0),
             "cost_basis": float(row.get("Cost Basis", 0) or 0),
             "current_value": float(row.get("Current Value", 0) or 0),
-            "pct_of_portfolio": float(pct) / 100.0 if pct and pct > 1 else float(pct or 0),
+            # "% Total Portfolio" is a percentage (e.g. 1.51 == 1.51%).
+            "pct_of_portfolio": float(pct) / 100.0 if pct is not None else 0.0,
             "sector": row.get("Sector"),
-            "asset_type": row.get("Asset Type"),
+            "asset_type": row.get("AssetType"),
         })
     log = build_master_log()  # full history
     revealed = []

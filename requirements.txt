@@ -5,3 +5,6 @@ PyYAML>=6.0
 python-dotenv>=1.0
 pytest>=8.0
 pyarrow>=14
+# Needed to import the portfolio_analysis codebase (its DB layer + query cache)
+mysql-connector-python>=8.0.21
+diskcache>=5.6.1
