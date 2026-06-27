@@ -23,6 +23,19 @@ deliberately challenging) brief. Research aid — **not financial advice**.
 Each run writes `reports/brief-<date>.md`, `.html`, and `.json` (the structured brief, for re-rendering).
 - Tests: `python -m pytest -v`
 
+## Chat (conversational analyst)
+
+Talk to the analyst interactively — it loads your live portfolio, the latest
+saved signals, your interest overlay, and the latest brief, and can pull exact
+ticker metrics or re-run the screen on demand:
+
+```
+python chat.py
+```
+
+Type questions; `exit`/`quit` to leave. Each session writes a transcript to
+`reports/chat-<timestamp>.md`. Needs `ANTHROPIC_API_KEY` in `.env`.
+
 ## Schedule (cron)
 Weekly, Sunday 7am:
 ```
