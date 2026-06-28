@@ -6,3 +6,4 @@ reports/
 cache/
 .pytest_cache/
 .venv/
+.superpowers/
