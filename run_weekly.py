@@ -1,21 +1,21 @@
 import logging
 import yaml
 from pathlib import Path
-from radar.settings import load_settings
-from radar.universe import load_universe
-from radar.data_ingest import fetch_market_data
-from radar.screener import run_screener
-from radar.portfolio_context import load_portfolio_context
-from radar.analyst import generate_brief
-from radar.report import save_report, render_html
-from radar.deliver import send_email
+from vantage.settings import load_settings
+from vantage.universe import load_universe
+from vantage.data_ingest import fetch_market_data
+from vantage.screener import run_screener
+from vantage.portfolio_context import load_portfolio_context
+from vantage.analyst import generate_brief
+from vantage.report import save_report, render_html
+from vantage.deliver import send_email
 
 logger = logging.getLogger(__name__)
 
 
 def _fallback_brief(signal_set, error):
-    from radar.models import Brief
-    from radar.analyst import DISCLAIMER
+    from vantage.models import Brief
+    from vantage.analyst import DISCLAIMER
     leaders = ", ".join(s.ticker for s in signal_set.signals[:15]) or "none"
     return Brief(
         as_of=signal_set.as_of,

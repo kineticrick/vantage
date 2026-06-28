@@ -1,9 +1,9 @@
 # tests/test_run_weekly.py
 from pathlib import Path
 import run_weekly
-from radar.settings import Settings
-from radar.data_ingest import MarketData
-from radar.models import PortfolioContext, Brief, BriefItem
+from vantage.settings import Settings
+from vantage.data_ingest import MarketData
+from vantage.models import PortfolioContext, Brief, BriefItem
 import pandas as pd
 
 def _settings(tmp_path):

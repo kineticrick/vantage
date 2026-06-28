@@ -1,7 +1,7 @@
 # tests/test_data_ingest.py
 from datetime import date
 import pandas as pd
-from radar.data_ingest import fetch_market_data, MarketData
+from vantage.data_ingest import fetch_market_data, MarketData
 
 def _fake_download(tickers, period):
     # Mimic yfinance.download multiindex columns: (field, ticker)

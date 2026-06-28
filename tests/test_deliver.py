@@ -1,6 +1,6 @@
 # tests/test_deliver.py
-from radar.deliver import send_email
-from radar.settings import Settings
+from vantage.deliver import send_email
+from vantage.settings import Settings
 from pathlib import Path
 
 class _FakeSMTP:

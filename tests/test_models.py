@@ -1,4 +1,4 @@
-from radar.models import Signal, SignalSet, Holding, PortfolioContext, Brief, BriefItem
+from vantage.models import Signal, SignalSet, Holding, PortfolioContext, Brief, BriefItem
 
 def test_signalset_roundtrip(tmp_path):
     ss = SignalSet(

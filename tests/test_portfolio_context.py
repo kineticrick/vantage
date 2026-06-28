@@ -1,5 +1,5 @@
-from radar.portfolio_context import load_portfolio_context
-from radar.models import PortfolioContext
+from vantage.portfolio_context import load_portfolio_context
+from vantage.models import PortfolioContext
 
 def _fake_loader(pa_path):
     return {

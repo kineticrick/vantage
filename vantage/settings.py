@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PA_PATH = "/home/kineticrick/code/python/portfolio_analysis"
+DEFAULT_PA_PATH = "/home/kineticrick/code/python/wake"  # the Wake project (portfolio data)
 
 @dataclass
 class Settings:
@@ -33,8 +33,8 @@ def load_settings(load_dotenv_file: bool = True) -> Settings:
         gmail_user=os.getenv("GMAIL_USER", ""),
         gmail_app_password=os.getenv("GMAIL_APP_PASSWORD", ""),
         email_recipient=os.getenv("EMAIL_RECIPIENT", ""),
-        model=os.getenv("RADAR_MODEL", "claude-opus-4-8"),
-        portfolio_analysis_path=os.getenv("PORTFOLIO_ANALYSIS_PATH", DEFAULT_PA_PATH),
+        model=os.getenv("VANTAGE_MODEL", "claude-opus-4-8"),
+        portfolio_analysis_path=os.getenv("WAKE_PATH", DEFAULT_PA_PATH),
         project_root=PROJECT_ROOT,
         config_dir=PROJECT_ROOT / "config",
         data_dir=data_dir,

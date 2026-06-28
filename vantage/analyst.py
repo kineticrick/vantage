@@ -1,6 +1,6 @@
 import json
 
-from radar.persona import ANALYST_PERSONA
+from vantage.persona import ANALYST_PERSONA
 
 DISCLAIMER = ("This is an automated research aid, not financial advice. "
               "Verify independently before making any investment decision.")
@@ -38,7 +38,7 @@ def build_prompt(signal_set, portfolio_context, interests) -> str:
     )
 
 def parse_brief(response_text, as_of):
-    from radar.models import Brief, BriefItem
+    from vantage.models import Brief, BriefItem
     text = response_text
     if "```json" in text:
         text = text.split("```json", 1)[1].split("```", 1)[0]

@@ -1,6 +1,6 @@
 import pandas as pd
 from statistics import median
-from radar.models import Signal, SignalSet
+from vantage.models import Signal, SignalSet
 
 _WINDOWS = {"ret_1m": 21, "ret_3m": 63, "ret_6m": 126, "ret_12m": 252}
 

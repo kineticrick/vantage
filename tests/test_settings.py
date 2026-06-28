@@ -1,6 +1,6 @@
 # tests/test_settings.py
 from pathlib import Path
-import radar.settings as s
+import vantage.settings as s
 
 def test_load_settings_reads_env_and_makes_dirs(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "key123")

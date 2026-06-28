@@ -1,7 +1,7 @@
 # tests/test_screener.py
 import pandas as pd
-from radar.data_ingest import MarketData
-from radar.screener import run_screener
+from vantage.data_ingest import MarketData
+from vantage.screener import run_screener
 
 def _series(values):
     idx = pd.date_range("2025-06-01", periods=len(values), freq="D")

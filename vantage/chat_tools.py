@@ -1,6 +1,6 @@
-from radar.data_ingest import fetch_market_data
-from radar.screener import _WINDOWS, _trailing_return, _volume_ratio, run_screener
-from radar.universe import load_universe
+from vantage.data_ingest import fetch_market_data
+from vantage.screener import _WINDOWS, _trailing_return, _volume_ratio, run_screener
+from vantage.universe import load_universe
 
 def get_ticker_metrics(ticker, settings, _downloader=None, _sector_fn=None) -> dict:
     ticker = ticker.upper().strip()

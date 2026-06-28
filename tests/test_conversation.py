@@ -1,8 +1,8 @@
 # tests/test_conversation.py
 import types
 from pathlib import Path
-from radar.settings import Settings
-from radar.conversation import Conversation
+from vantage.settings import Settings
+from vantage.conversation import Conversation
 
 def _settings():
     return Settings(anthropic_api_key="k", gmail_user="", gmail_app_password="",
@@ -40,7 +40,7 @@ class _FakeClient:
     def __init__(self, turns): self.messages = _FakeMessages(turns)
 
 def test_send_runs_custom_tool_loop_and_yields_events(monkeypatch):
-    import radar.conversation as cm
+    import vantage.conversation as cm
     monkeypatch.setattr(cm, "dispatch", lambda name, inp, s: {"ticker": "MU", "ret_12m": 7.9})
     # turn 1: model calls a custom tool; turn 2: final streamed text
     turn1 = (_final([_tool("tu1", "get_ticker_metrics", {"ticker": "MU"})], "tool_use"), [])
@@ -57,7 +57,7 @@ def test_send_runs_custom_tool_loop_and_yields_events(monkeypatch):
     assert conv.messages[2]["content"][0]["tool_use_id"] == "tu1"
 
 def test_send_preserves_history_across_calls(monkeypatch):
-    import radar.conversation as cm
+    import vantage.conversation as cm
     monkeypatch.setattr(cm, "dispatch", lambda *a: {})
     t1 = (_final([_text("Hi.")], "end_turn"), ["Hi."])
     t2 = (_final([_text("Still here.")], "end_turn"), ["Still here."])
@@ -85,7 +85,7 @@ def test_system_prompt_has_persona_context_and_disclaimer():
     assert "get_ticker_metrics" in conv.system        # tool note
 
 def test_send_bounds_runaway_tool_loop(monkeypatch):
-    import radar.conversation as cm
+    import vantage.conversation as cm
     monkeypatch.setattr(cm, "dispatch", lambda *a: {"ok": 1})
     # every turn asks for a custom tool again -> would loop forever without a bound
     forever = [(_final([_text("")], "tool_use"), [])  # but needs a custom tool_use block

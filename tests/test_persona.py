@@ -1,7 +1,7 @@
 # tests/test_persona.py
 def test_persona_extracted_and_reused_by_analyst():
-    from radar.persona import ANALYST_PERSONA
-    import radar.analyst as analyst
+    from vantage.persona import ANALYST_PERSONA
+    import vantage.analyst as analyst
     # the voice/jobs live in the shared persona
     assert "challenge" in ANALYST_PERSONA.lower()
     assert "second-order" in ANALYST_PERSONA.lower()

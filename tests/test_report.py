@@ -1,5 +1,5 @@
-from radar.models import Brief, BriefItem
-from radar.report import (render_markdown, render_html, save_markdown,
+from vantage.models import Brief, BriefItem
+from vantage.report import (render_markdown, render_html, save_markdown,
                           save_html, save_brief_json, save_report)
 
 def _brief():

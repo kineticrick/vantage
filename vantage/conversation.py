@@ -1,8 +1,8 @@
 import json
-from radar.persona import ANALYST_PERSONA
-from radar.analyst import DISCLAIMER
-from radar.chat_context import load_chat_context
-from radar.chat_tools import TOOL_DEFINITIONS, CUSTOM_TOOL_NAMES, dispatch
+from vantage.persona import ANALYST_PERSONA
+from vantage.analyst import DISCLAIMER
+from vantage.chat_context import load_chat_context
+from vantage.chat_tools import TOOL_DEFINITIONS, CUSTOM_TOOL_NAMES, dispatch
 
 _WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search"}
 _TOOL_NOTE = ("\n\nYou have two tools for exact figures: get_ticker_metrics(ticker) "

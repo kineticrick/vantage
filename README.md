@@ -1,4 +1,6 @@
-# Market Insights — Blind-Spot Radar
+# Vantage
+
+*See where the market's headed.*
 
 An AI-driven research **partner** for stock-market decision-making. It scans the
 market for things you might be missing, fuses hard price/volume signals with
@@ -23,7 +25,7 @@ it: a proactive **weekly brief**, and an interactive **conversational analyst**.
   exact ticker metrics, re-run the screen, and web-search for news on demand, so
   its numbers are real, not guessed.
 - **Grounded in your real holdings** — both modes load your live portfolio and
-  full transaction history from the `portfolio_analysis` project (read-only).
+  full transaction history from the **Wake** project (read-only).
 - **Challenge-first** — it pressure-tests over-concentration, stale theses,
   missed rotations, and recurring behavioral patterns in your trading history.
 
@@ -35,9 +37,9 @@ it: a proactive **weekly brief**, and an interactive **conversational analyst**.
    - `ANTHROPIC_API_KEY` — required for the analyst (both modes).
    - `GMAIL_USER`, `GMAIL_APP_PASSWORD` (a Gmail **App Password**, not your
      login), `EMAIL_RECIPIENT` — only needed to *email* the weekly brief.
-4. Make sure the `portfolio_analysis` codebase is at
-   `/home/kineticrick/code/python/portfolio_analysis` (or set
-   `PORTFOLIO_ANALYSIS_PATH`), and its MySQL DB is reachable. If it isn't, both
+4. Make sure the **Wake** codebase is at
+   `/home/kineticrick/code/python/wake` (or set
+   `WAKE_PATH`), and its MySQL DB is reachable. If it isn't, both
    modes still run in **market-wide-only mode** (noted in the output).
 5. (Optional) Tune `config/universe.txt` and `config/interests.yaml` — see
    [Configuration](#configuration).
@@ -99,8 +101,8 @@ python -m pytest -q
 ## Configuration
 
 - **`.env`** — secrets (git-ignored). See `.env.example`. Optional
-  `RADAR_MODEL` overrides the analyst model (default `claude-opus-4-8`);
-  `PORTFOLIO_ANALYSIS_PATH` overrides the portfolio_analysis location.
+  `VANTAGE_MODEL` overrides the analyst model (default `claude-opus-4-8`);
+  `WAKE_PATH` overrides the Wake (portfolio data) location.
 - **`config/universe.txt`** — the ticker universe, one symbol per line
   (`#` comments allowed). Regenerate with `tools/build_universe.py`.
 - **`config/interests.yaml`** — your interest overlay (themes, sectors, risk
@@ -122,7 +124,7 @@ python -m pytest -q
 Weekly, Sunday 7am:
 
 ```
-0 7 * * 0 cd /home/kineticrick/code/python/market_insights && /path/to/.venv/bin/python run_weekly.py >> reports/cron.log 2>&1
+0 7 * * 0 cd /home/kineticrick/code/python/vantage && /path/to/.venv/bin/python run_weekly.py >> reports/cron.log 2>&1
 ```
 
 ## Architecture
@@ -132,10 +134,10 @@ and a Claude analyst layer for judgment (narratives, convergence, second-order
 reasoning, challenge). Units communicate through plain dataclasses.
 
 - Weekly pipeline: `data_ingest → screener → portfolio_context → analyst → report → deliver`
-- Conversational analyst: a web-ready `Conversation` engine (`radar/conversation.py`)
+- Conversational analyst: a web-ready `Conversation` engine (`vantage/conversation.py`)
   whose `send()` yields an event stream, consumed by the `chat.py` terminal REPL;
-  it reuses the analyst persona (`radar/persona.py`) and custom tools
-  (`radar/chat_tools.py`) over the same deterministic units.
+  it reuses the analyst persona (`vantage/persona.py`) and custom tools
+  (`vantage/chat_tools.py`) over the same deterministic units.
 
 Design specs:
 - `docs/superpowers/specs/2026-06-26-market-insights-blind-spot-radar-design.md`

@@ -1,7 +1,7 @@
 # tests/test_chat.py
 from pathlib import Path
 import chat
-from radar.settings import Settings
+from vantage.settings import Settings
 
 def _settings(tmp_path):
     (tmp_path / "reports").mkdir(exist_ok=True)

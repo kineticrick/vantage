@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
-from radar.settings import load_settings
-from radar.conversation import Conversation
+from vantage.settings import load_settings
+from vantage.conversation import Conversation
 
 def main(argv=None, settings=None, _conversation=None, _input=None) -> None:
     s = settings or load_settings()

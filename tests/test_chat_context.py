@@ -1,9 +1,9 @@
 # tests/test_chat_context.py
 import json
 from pathlib import Path
-from radar.settings import Settings
-from radar.chat_context import ChatContext, load_chat_context
-from radar.models import SignalSet, Signal, Brief, BriefItem, PortfolioContext
+from vantage.settings import Settings
+from vantage.chat_context import ChatContext, load_chat_context
+from vantage.models import SignalSet, Signal, Brief, BriefItem, PortfolioContext
 
 def _settings(tmp_path):
     for d in ("data", "reports", "config"):

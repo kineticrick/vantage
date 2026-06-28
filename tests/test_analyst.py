@@ -1,6 +1,6 @@
 import json
-from radar.models import SignalSet, Signal, PortfolioContext, Brief
-from radar.analyst import build_prompt, parse_brief
+from vantage.models import SignalSet, Signal, PortfolioContext, Brief
+from vantage.analyst import build_prompt, parse_brief
 
 def _sigset():
     return SignalSet(as_of="2026-06-26",

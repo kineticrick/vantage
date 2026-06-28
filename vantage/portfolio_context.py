@@ -1,5 +1,5 @@
 import sys
-from radar.models import Holding, PortfolioContext
+from vantage.models import Holding, PortfolioContext
 
 def _real_loader(pa_path: str) -> dict:
     if pa_path not in sys.path:

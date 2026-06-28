@@ -1,10 +1,10 @@
 # tests/test_chat_tools.py
 import pandas as pd
 from pathlib import Path
-from radar.settings import Settings
-from radar.chat_tools import (get_ticker_metrics, run_screen, dispatch,
+from vantage.settings import Settings
+from vantage.chat_tools import (get_ticker_metrics, run_screen, dispatch,
                               TOOL_DEFINITIONS, CUSTOM_TOOL_NAMES)
-from radar.data_ingest import MarketData
+from vantage.data_ingest import MarketData
 
 def _settings(tmp_path):
     (tmp_path / "config").mkdir(exist_ok=True)

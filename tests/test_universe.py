@@ -1,5 +1,5 @@
 # tests/test_universe.py
-from radar.universe import load_universe
+from vantage.universe import load_universe
 
 def test_load_universe_parses_and_dedupes(tmp_path):
     f = tmp_path / "universe.txt"

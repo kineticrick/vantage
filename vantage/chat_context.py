@@ -2,8 +2,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 import yaml
-from radar.models import SignalSet, Brief, PortfolioContext
-from radar.portfolio_context import load_portfolio_context
+from vantage.models import SignalSet, Brief, PortfolioContext
+from vantage.portfolio_context import load_portfolio_context
 
 def _newest(directory, pattern):
     files = sorted(Path(directory).glob(pattern))
