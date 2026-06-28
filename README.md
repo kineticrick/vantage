@@ -168,5 +168,4 @@ Design specs:
 - `docs/superpowers/specs/2026-06-27-conversational-analyst-design.md`
 
 Planned fast-follow: daily signal alerts (`run_daily.py`, reusing the screener).
-A web UI for the conversational analyst is a deliberate future addition — the
-engine's event-stream interface is built so it's a clean add.
+The web dashboard (`python -m vantage.web`, `vantage/web/`) serves the same conversational engine plus read views of signals, portfolio, and briefs in the browser over SSE.

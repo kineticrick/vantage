@@ -1,6 +1,8 @@
 const $ = (id) => document.getElementById(id);
 const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
 const cls = (v) => (v >= 0 ? "up" : "down");
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
+  (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 async function getJSON(url) { const r = await fetch(url); return r.json(); }
 
@@ -11,29 +13,29 @@ function rows(items, render) {
 async function loadOverview() {
   const o = await getJSON("/api/overview");
   $("overview").innerHTML = `<h2>Overview</h2>
-    <div class="note">Signals as of ${o.signals_as_of || "—"}</div>
+    <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
-    ${rows(o.top_leaders, (l) => `<div class="row"><span>${l.ticker}</span>
+    ${rows(o.top_leaders, (l) => `<div class="row"><span>${esc(l.ticker)}</span>
       <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
     <div class="label">Sector momentum</div>
-    ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${m.sector}</span>
+    ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
       <span class="${cls(m.value)}">${pct(m.value)}</span></div>`)}
-    ${o.latest_brief ? `<div class="label">Latest brief — ${o.latest_brief.as_of}</div>
-      <div>${o.latest_brief.executive_summary}</div>` : ""}`;
+    ${o.latest_brief ? `<div class="label">Latest brief — ${esc(o.latest_brief.as_of)}</div>
+      <div>${esc(o.latest_brief.executive_summary)}</div>` : ""}`;
 }
 
 async function loadPortfolio() {
   const p = await getJSON("/api/portfolio");
   if (!p.available) {
     $("portfolio").innerHTML =
-      `<h2>Portfolio</h2><div class="note">Unavailable: ${p.note || "—"}</div>`;
+      `<h2>Portfolio</h2><div class="note">Unavailable: ${esc(p.note) || "—"}</div>`;
     return;
   }
   $("portfolio").innerHTML = `<h2>Portfolio</h2>
     <div class="label">Top positions</div>
     ${rows(p.holdings.slice().sort((a, b) => (b.pct_of_portfolio || 0) -
         (a.pct_of_portfolio || 0)).slice(0, 8),
-      (h) => `<div class="row"><span>${h.ticker} — ${h.name || ""}</span>
+      (h) => `<div class="row"><span>${esc(h.ticker)} — ${esc(h.name)}</span>
         <span>${pct(h.pct_of_portfolio)}</span></div>`)}`;
 }
 
@@ -41,7 +43,7 @@ async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
     ${rows(s.signals, (sig) => `<div class="row">
-      <span>${sig.ticker} · ${sig.signal_type}</span>
+      <span>${esc(sig.ticker)} · ${esc(sig.signal_type)}</span>
       <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
         ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
 }
@@ -49,8 +51,8 @@ async function loadSignals() {
 async function loadBriefs() {
   const briefs = await getJSON("/api/briefs");
   $("briefs").innerHTML = `<h2>Briefs</h2>
-    ${rows(briefs, (b) => `<div class="row"><span>${b.as_of}</span>
-      <span class="note">${b.summary.slice(0, 60)}…</span></div>`)}`;
+    ${rows(briefs, (b) => `<div class="row"><span>${esc(b.as_of)}</span>
+      <span class="note">${esc(b.summary.slice(0, 60))}…</span></div>`)}`;
 }
 
 function loadData() { loadOverview(); loadPortfolio(); loadSignals(); loadBriefs(); }
@@ -95,18 +97,22 @@ $("chat-form").addEventListener("submit", async (e) => {
   addMsg("user", msg);
   input.value = "";
   let bubble = null;
-  await streamPost("/api/chat", { message: msg }, (ev) => {
-    if (ev.type === "text") {
-      if (!bubble) bubble = addMsg("analyst", "");
-      bubble.textContent += ev.text;
-      $("chat-log").scrollTop = $("chat-log").scrollHeight;
-    } else if (ev.type === "tool_use") {
-      addMsg("tool", `[looking up via ${ev.name}(${JSON.stringify(ev.input || {})})]`);
-      bubble = null;
-    } else if (ev.type === "error") {
-      addMsg("error", `[error: ${ev.message}]`);
-    }
-  });
+  try {
+    await streamPost("/api/chat", { message: msg }, (ev) => {
+      if (ev.type === "text") {
+        if (!bubble) bubble = addMsg("analyst", "");
+        bubble.textContent += ev.text;
+        $("chat-log").scrollTop = $("chat-log").scrollHeight;
+      } else if (ev.type === "tool_use") {
+        addMsg("tool", `[looking up via ${ev.name}(${JSON.stringify(ev.input || {})})]`);
+        bubble = null;
+      } else if (ev.type === "error") {
+        addMsg("error", `[error: ${ev.message}]`);
+      }
+    });
+  } catch (e) {
+    addMsg("error", "[error: " + e + "]");
+  }
 });
 
 $("chat-new").addEventListener("click", async () => {
@@ -118,12 +124,17 @@ $("chat-new").addEventListener("click", async () => {
 $("refresh-btn").addEventListener("click", async () => {
   const btn = $("refresh-btn");
   btn.disabled = true;
-  await streamPost("/api/refresh", {}, (ev) => {
-    if (ev.type === "progress") $("refresh-status").textContent = ev.stage + "…";
-    else if (ev.type === "error") $("refresh-status").textContent = "error: " + ev.message;
-    else if (ev.type === "done") { $("refresh-status").textContent = "updated"; loadData(); }
-  });
-  btn.disabled = false;
+  try {
+    await streamPost("/api/refresh", {}, (ev) => {
+      if (ev.type === "progress") $("refresh-status").textContent = ev.stage + "…";
+      else if (ev.type === "error") $("refresh-status").textContent = "error: " + ev.message;
+      else if (ev.type === "done") { $("refresh-status").textContent = "updated"; loadData(); }
+    });
+  } catch (e) {
+    $("refresh-status").textContent = "error: " + e;
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 loadData();
