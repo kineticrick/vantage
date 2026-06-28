@@ -21,7 +21,8 @@ def create_app(settings=None, conversation_factory=None,
     app.state.conversation_factory = conversation_factory or (lambda s: Conversation(s))
     from vantage.portfolio_context import load_portfolio_context
     app.state.portfolio_loader = portfolio_loader or load_portfolio_context
-    app.state.refresh_runner = refresh_runner
+    from vantage.web.pipeline import run_refresh
+    app.state.refresh_runner = refresh_runner or run_refresh
     app.state.conversation = None
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -78,5 +79,10 @@ def create_app(settings=None, conversation_factory=None,
     def chat_new():
         app.state.conversation = None
         return {"ok": True}
+
+    @app.post("/api/refresh")
+    def refresh():
+        return StreamingResponse(_sse(app.state.refresh_runner(app.state.settings)),
+                                 media_type="text/event-stream")
 
     return app
