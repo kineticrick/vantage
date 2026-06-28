@@ -21,7 +21,7 @@ async function loadOverview() {
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
       <span class="${cls(m.value)}">${pct(m.value)}</span></div>`)}
     ${o.latest_brief ? `<div class="label">Latest brief — ${esc(o.latest_brief.as_of)}</div>
-      <div>${esc(o.latest_brief.executive_summary)}</div>` : ""}`;
+      <p class="prose lede">${esc(o.latest_brief.executive_summary)}</p>` : ""}`;
 }
 
 async function loadPortfolio() {
@@ -83,18 +83,26 @@ async function openBrief(asOf) {
   if (!b) return;
   const panel = $("brief-detail");
   panel.style.display = "block";
-  panel.innerHTML = `<h2>Brief — ${esc(b.as_of)}</h2>
-    <button onclick="$('brief-detail').style.display='none'">Close</button>
-    <div class="label">Executive summary</div><div>${esc(b.executive_summary)}</div>
-    ${(b.items || []).map((i) => `<div class="label">${esc(i.title)}</div>
-      <div><strong>Thesis:</strong> ${esc(i.thesis)}</div>
-      <div><strong>Evidence:</strong> ${esc(i.evidence)}</div>
-      <div><strong>Why it matters:</strong> ${esc(i.why_it_matters)}</div>
-      <div><strong>Portfolio relevance:</strong> ${esc(i.portfolio_relevance)}</div>
-      ${(i.sources && i.sources.length) ? `<div class="note">Sources: ${esc(i.sources.join(", "))}</div>` : ""}`).join("")}
-    <div class="label">Challenge &amp; coaching</div><div>${esc(b.challenge)}</div>
-    <div class="label">What I might be missing</div><div>${esc(b.what_im_missing)}</div>
-    <div class="label">Watchlist</div><div>${esc((b.watchlist || []).join(", ")) || "—"}</div>`;
+  // field name above its text (block label), not an inline "Thesis:"; k is static.
+  const field = (k, v) => `<p class="brief-field"><span class="field-k">${k}</span>${esc(v)}</p>`;
+  panel.innerHTML = `<div class="brief-head"><h2>Brief — ${esc(b.as_of)}</h2>
+      <button id="brief-close">Close</button></div>
+    <div class="brief-body">
+      <div class="label">Executive summary</div>
+      <p class="prose lede">${esc(b.executive_summary)}</p>
+      ${(b.items || []).map((i) => `<div class="brief-item">
+        <h3 class="brief-item-title">${esc(i.title)}</h3>
+        ${field("Thesis", i.thesis)}
+        ${field("Evidence", i.evidence)}
+        ${field("Why it matters", i.why_it_matters)}
+        ${field("Portfolio relevance", i.portfolio_relevance)}
+        ${(i.sources && i.sources.length) ? `<p class="brief-sources">Sources: ${esc(i.sources.join(", "))}</p>` : ""}
+      </div>`).join("")}
+      <div class="label">Challenge &amp; coaching</div><p class="prose">${esc(b.challenge)}</p>
+      <div class="label">What I might be missing</div><p class="prose">${esc(b.what_im_missing)}</p>
+      <div class="label">Watchlist</div><p class="prose">${esc((b.watchlist || []).join(", ")) || "—"}</p>
+    </div>`;
+  $("brief-close").addEventListener("click", () => { panel.style.display = "none"; });
   panel.scrollIntoView({ behavior: "smooth" });
 }
 

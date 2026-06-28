@@ -42,3 +42,26 @@ button:hover { filter: brightness(1.08); }
 .chat-form textarea { flex: 1; resize: none; background: var(--bg);
   color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 8px;
   font-family: var(--sans); }
+
+/* --- Brief reading typography --- */
+/* Long-form prose: comfortable measure + leading so blocks read like text,
+   not a wall. Constrained width is intentional whitespace, not a bug. */
+.prose { max-width: 68ch; line-height: 1.72; margin: 0 0 1rem; }
+.prose:last-child { margin-bottom: 0; }
+.prose.lede { font-size: 15.5px; color: var(--ink); }
+
+.brief-head { display: flex; align-items: baseline; justify-content: space-between;
+              gap: 12px; margin-bottom: 4px; }
+.brief-body { max-width: 72ch; }
+
+/* Each notable item is a distinct block, separated by a hairline rule. */
+.brief-item { padding: 18px 0; border-top: 1px solid var(--line); }
+.brief-item-title { font-family: var(--serif); font-weight: 600; font-size: 16px;
+                    color: var(--ink); margin: 0 0 12px; line-height: 1.3; }
+.brief-field { margin: 0 0 11px; line-height: 1.65; }
+.brief-field:last-child { margin-bottom: 0; }
+/* Field name as a small label above its text, rather than an inline "Thesis:". */
+.field-k { display: block; text-transform: uppercase; letter-spacing: 1px;
+           font-size: 10.5px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
+.brief-sources { font-size: 12.5px; color: var(--muted); font-style: italic;
+                 line-height: 1.6; overflow-wrap: anywhere; margin: 10px 0 0; }
