@@ -1,1 +1,44 @@
-/* Vantage dashboard styles — implemented in Task 6 */
+:root {
+  --bg: #15131a; --panel: #1c1a24; --ink: #e8e3ef; --muted: #9b8fb0;
+  --accent: #8c7bb5; --line: #2a2733; --up: #7fd6a8; --down: #e08a8a;
+  --serif: Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font-family: var(--sans); font-size: 15px; }
+.shell { display: grid; grid-template-columns: 1fr 380px; height: 100vh; }
+.data-col { overflow-y: auto; padding: 24px 28px; }
+.chat-col { border-left: 1px solid var(--line); display: flex;
+            flex-direction: column; background: var(--panel); }
+.topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.topbar h1 { font-family: var(--serif); font-weight: 600; margin: 0; flex: 0 0 auto; }
+.status { color: var(--muted); font-size: 13px; }
+button { background: var(--accent); color: #14121a; border: 0; border-radius: 7px;
+         padding: 7px 13px; font-weight: 600; cursor: pointer; }
+button:hover { filter: brightness(1.08); }
+.panel { background: var(--panel); border: 1px solid var(--line);
+         border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+.panel h2 { font-family: var(--serif); font-weight: 600; font-size: 18px;
+            margin: 0 0 12px; }
+.label { text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px;
+         color: var(--muted); margin: 14px 0 6px; }
+.row { display: flex; justify-content: space-between; padding: 4px 0;
+       border-bottom: 1px solid var(--line); font-size: 14px; }
+.row:last-child { border-bottom: 0; }
+.up { color: var(--up); } .down { color: var(--down); }
+.note { color: var(--muted); font-style: italic; }
+.chat-head { display: flex; justify-content: space-between; align-items: center;
+             padding: 14px 16px; border-bottom: 1px solid var(--line);
+             font-family: var(--serif); }
+.chat-log { flex: 1; overflow-y: auto; padding: 16px; }
+.msg { margin-bottom: 14px; line-height: 1.5; white-space: pre-wrap; }
+.msg.user { color: var(--ink); }
+.msg.analyst { background: rgba(140,123,181,.14); border-radius: 10px;
+               padding: 10px 12px; }
+.msg.tool { color: var(--muted); font-size: 13px; font-style: italic; }
+.msg.error { color: var(--down); }
+.chat-form { display: flex; gap: 8px; padding: 12px; border-top: 1px solid var(--line); }
+.chat-form textarea { flex: 1; resize: none; background: var(--bg);
+  color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 8px;
+  font-family: var(--sans); }

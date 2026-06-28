@@ -82,6 +82,30 @@ When it fetches data mid-answer you'll see a note like
 `quit`, or Ctrl-D; each session is saved to `reports/chat-<timestamp>.md`. Each
 turn is a real (paid) Claude call, so expect a brief pause while it thinks.
 
+### Web dashboard
+
+```bash
+python -m vantage.web
+```
+
+Opens a local server at `http://127.0.0.1:8000` with a two-column editorial
+dashboard: data panels on the left (Overview, Portfolio, Signals, Briefs) and
+an analyst chat docked on the right.
+
+- **Data panels** read the latest artifacts from `data/` and `reports/` — no
+  re-run needed. If no artifacts are present yet, panels show "None" /
+  "Unavailable" without errors.
+- **Refresh data** re-runs the full quantitative pipeline (market fetch →
+  screener → portfolio context) and reloads all panels on completion. This
+  makes real market-data requests and takes a few minutes.
+- **Analyst chat** streams responses token-by-token using the same
+  conversational engine as `chat.py`. Requires `ANTHROPIC_API_KEY`. "New
+  conversation" starts a fresh session.
+
+The server uses the same `WAKE_PATH` and portfolio settings as the CLI; if
+Wake is unreachable, Portfolio shows "Unavailable" and the other panels are
+unaffected.
+
 ### Rebuild the ticker universe
 
 ```bash
