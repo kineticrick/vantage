@@ -1,8 +1,8 @@
 import json
 from dataclasses import asdict
 from pathlib import Path
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from vantage.settings import load_settings
 from vantage.conversation import Conversation
@@ -61,5 +61,22 @@ def create_app(settings=None, conversation_factory=None,
         if b is None:
             return JSONResponse({"error": "not found"}, status_code=404)
         return {"brief": b.to_dict(), "html": art.read_brief_html(s.reports_dir, as_of)}
+
+    def _get_conversation():
+        if app.state.conversation is None:
+            app.state.conversation = app.state.conversation_factory(app.state.settings)
+        return app.state.conversation
+
+    @app.post("/api/chat")
+    async def chat(request: Request):
+        body = await request.json()
+        conv = _get_conversation()
+        return StreamingResponse(_sse(conv.send(body.get("message", ""))),
+                                 media_type="text/event-stream")
+
+    @app.post("/api/chat/new")
+    def chat_new():
+        app.state.conversation = None
+        return {"ok": True}
 
     return app
