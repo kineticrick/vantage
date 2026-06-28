@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_PA_PATH = "/home/kineticrick/code/python/wake"  # the Wake project (portfolio data)
+DEFAULT_PA_PATH = os.path.expanduser("~/code/python/wake")  # the Wake project (portfolio data)
 
 @dataclass
 class Settings:

@@ -38,7 +38,7 @@ it: a proactive **weekly brief**, and an interactive **conversational analyst**.
    - `GMAIL_USER`, `GMAIL_APP_PASSWORD` (a Gmail **App Password**, not your
      login), `EMAIL_RECIPIENT` — only needed to *email* the weekly brief.
 4. Make sure the **Wake** codebase is at
-   `/home/kineticrick/code/python/wake` (or set
+   `~/code/python/wake` (or set
    `WAKE_PATH`), and its MySQL DB is reachable. If it isn't, both
    modes still run in **market-wide-only mode** (noted in the output).
 5. (Optional) Tune `config/universe.txt` and `config/interests.yaml` — see
@@ -124,7 +124,7 @@ python -m pytest -q
 Weekly, Sunday 7am:
 
 ```
-0 7 * * 0 cd /home/kineticrick/code/python/vantage && /path/to/.venv/bin/python run_weekly.py >> reports/cron.log 2>&1
+0 7 * * 0 cd ~/code/python/vantage && /path/to/.venv/bin/python run_weekly.py >> reports/cron.log 2>&1
 ```
 
 ## Architecture
