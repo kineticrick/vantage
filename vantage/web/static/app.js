@@ -50,13 +50,35 @@ async function loadSignals() {
 
 async function loadBriefs() {
   const briefs = await getJSON("/api/briefs");
-  $("briefs").innerHTML = `<h2>Briefs</h2>
-    ${rows(briefs, (b) => `<div class="row" style="cursor:pointer" onclick="openBrief('${esc(b.as_of)}')"><span>${esc(b.as_of)}</span>
-      <span class="note">${esc(b.summary.slice(0, 60))}…</span></div>`)}`;
+  const panel = $("briefs");
+  panel.innerHTML = "<h2>Briefs</h2>";
+  if (!briefs.length) {
+    const none = document.createElement("div");
+    none.className = "note";
+    none.textContent = "None";
+    panel.appendChild(none);
+    return;
+  }
+  // Build rows via DOM + addEventListener (not an interpolated inline onclick):
+  // HTML-escaping is the wrong escaping for a JS-string-in-attribute context.
+  for (const b of briefs) {
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.cursor = "pointer";
+    const date = document.createElement("span");
+    date.textContent = b.as_of;
+    const summary = document.createElement("span");
+    summary.className = "note";
+    summary.textContent = (b.summary || "").slice(0, 60) + "…";
+    row.append(date, summary);
+    row.addEventListener("click", () => openBrief(b.as_of));
+    panel.appendChild(row);
+  }
 }
 
 async function openBrief(asOf) {
-  const data = await getJSON(`/api/briefs/${asOf}`);
+  if (!/^[0-9-]+$/.test(asOf)) return;  // brief ids are dates; reject anything else
+  const data = await getJSON(`/api/briefs/${encodeURIComponent(asOf)}`);
   const b = data.brief;
   if (!b) return;
   const panel = $("brief-detail");
