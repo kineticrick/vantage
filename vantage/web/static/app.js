@@ -51,8 +51,29 @@ async function loadSignals() {
 async function loadBriefs() {
   const briefs = await getJSON("/api/briefs");
   $("briefs").innerHTML = `<h2>Briefs</h2>
-    ${rows(briefs, (b) => `<div class="row"><span>${esc(b.as_of)}</span>
+    ${rows(briefs, (b) => `<div class="row" style="cursor:pointer" onclick="openBrief('${esc(b.as_of)}')"><span>${esc(b.as_of)}</span>
       <span class="note">${esc(b.summary.slice(0, 60))}…</span></div>`)}`;
+}
+
+async function openBrief(asOf) {
+  const data = await getJSON(`/api/briefs/${asOf}`);
+  const b = data.brief;
+  if (!b) return;
+  const panel = $("brief-detail");
+  panel.style.display = "block";
+  panel.innerHTML = `<h2>Brief — ${esc(b.as_of)}</h2>
+    <button onclick="$('brief-detail').style.display='none'">Close</button>
+    <div class="label">Executive summary</div><div>${esc(b.executive_summary)}</div>
+    ${(b.items || []).map((i) => `<div class="label">${esc(i.title)}</div>
+      <div><strong>Thesis:</strong> ${esc(i.thesis)}</div>
+      <div><strong>Evidence:</strong> ${esc(i.evidence)}</div>
+      <div><strong>Why it matters:</strong> ${esc(i.why_it_matters)}</div>
+      <div><strong>Portfolio relevance:</strong> ${esc(i.portfolio_relevance)}</div>
+      ${(i.sources && i.sources.length) ? `<div class="note">Sources: ${esc(i.sources.join(", "))}</div>` : ""}`).join("")}
+    <div class="label">Challenge &amp; coaching</div><div>${esc(b.challenge)}</div>
+    <div class="label">What I might be missing</div><div>${esc(b.what_im_missing)}</div>
+    <div class="label">Watchlist</div><div>${esc((b.watchlist || []).join(", ")) || "—"}</div>`;
+  panel.scrollIntoView({ behavior: "smooth" });
 }
 
 function loadData() { loadOverview(); loadPortfolio(); loadSignals(); loadBriefs(); }

@@ -10,7 +10,7 @@ def list_briefs(reports_dir):
     out = []
     for p in sorted(Path(reports_dir).glob("brief-*.json"), reverse=True):
         try:
-            d = json.loads(p.read_text())
+            d = json.loads(p.read_text(encoding="utf-8"))
         except (ValueError, OSError):
             continue
         out.append({"as_of": d.get("as_of"),
@@ -19,7 +19,7 @@ def list_briefs(reports_dir):
 
 def load_brief(reports_dir, as_of):
     p = Path(reports_dir) / f"brief-{as_of}.json"
-    return Brief.from_dict(json.loads(p.read_text())) if p.exists() else None
+    return Brief.from_dict(json.loads(p.read_text(encoding="utf-8"))) if p.exists() else None
 
 def read_brief_html(reports_dir, as_of):
     p = Path(reports_dir) / f"brief-{as_of}.html"
