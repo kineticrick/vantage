@@ -118,6 +118,11 @@ def test_expand_first_mention_fresh_seen_expands_again():
     b = expand_first_mention("MU fell", _FACTS, set())
     assert "Micron Technology" in a and "Micron Technology" in b
 
+def test_expand_first_mention_omitted_seen_does_not_leak_between_calls():
+    a = expand_first_mention("MU rose", _FACTS)
+    b = expand_first_mention("MU fell", _FACTS)
+    assert "Micron Technology" in a and "Micron Technology" in b
+
 def test_expand_first_mention_skips_ticker_with_no_facts():
     assert expand_first_mention("NONAME moved", _FACTS) == "NONAME moved"
 
