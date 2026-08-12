@@ -161,6 +161,10 @@ def load_cache_facts(cache_dir) -> dict:
         raw = json.loads(p.read_text(encoding="utf-8"))
     except (ValueError, OSError):
         return {}
+    if not isinstance(raw, dict):
+        # Valid JSON but not an object (e.g. "[]" or "null") is still corrupt
+        # from this cache's perspective.
+        return {}
     return {t: TickerFacts(ticker=t, name=e.get("name"), sector=e.get("sector"))
             for t, e in raw.items() if isinstance(e, dict)}
 
