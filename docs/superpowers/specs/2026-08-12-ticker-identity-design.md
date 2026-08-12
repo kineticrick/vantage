@@ -16,6 +16,8 @@ company name and sector next to every ticker, everywhere a ticker appears.
   positions) shows the company name and sector alongside the ticker.
 - Tickers embedded in prose (brief items, watchlist lines, chat replies) are
   identifiable without leaving the page.
+- The emailed brief carries the same identity information, by a mechanism that
+  survives mail clients (inline expansion, not tooltips).
 - No wrong annotations. A ticker that goes un-annotated is invisible to the
   user; a common English word annotated as a company is a visible bug. The
   design is deliberately conservative about prose.
@@ -91,7 +93,8 @@ Cost: one `.info` call per ticker, roughly 5–15 minutes. Run in the background
 - `/api/signals` needs no change — it serializes `Signal`, which now carries
   `name` and already carried `sector`.
 - `/api/portfolio` needs no change — `Holding` already carries both.
-- **New `/api/tickers`** returns `{TICKER: {"name", "sector"}}` for the
+- **New `/api/tickers`** returns `{TICKER: {"name", "sector", "common_word"}}`
+  for the
   *relevant set* only: tickers in the latest signal set, plus portfolio
   holdings, plus any cache-known ticker whose symbol appears in the latest
   brief's text (executive summary, item fields, challenge, what-I'm-missing,
@@ -125,6 +128,37 @@ would match unpredictably).
 Tooltip is CSS-only on `:hover` / `:focus` against `data-tip`, with
 `tabindex="0"` so it is reachable by keyboard and by tap on touch devices.
 
+### 2.6 Reports and email (`vantage/report.py`)
+
+The emailed brief gets the same information by a different mechanism: CSS
+tooltips are unreliable across mail clients, so the email uses **inline
+expansion on first mention** instead.
+
+```
+…your top movers are memory (MU (Micron Technology, Technology) +632%,
+WDC (Western Digital, Technology) +486%…
+```
+
+- Implemented by `expand_first_mention(text, facts, seen) -> str` in
+  `vantage/tickers.py`: plain text in, plain text out, applied **before**
+  HTML escaping so the escaping posture in `render_html` is unchanged.
+- **"First mention" resets per top-level section** — executive summary, each
+  brief item, challenge, what-I'm-missing, watchlist. A reader who jumps
+  straight to one item still gets the names, without the same expansion
+  repeating three times inside a single paragraph.
+- Applies to **both** `render_markdown` and `render_html`, so the `.md` and
+  `.html` artifacts agree.
+- **`brief-*.json` is never annotated.** It stays the raw structured source of
+  truth, which is what the web layer reads and applies its own tooltip
+  treatment to. Annotation happens at render time only and never mutates the
+  `Brief` object.
+- Signature: `render_markdown(brief, facts=None)`, `render_html(brief,
+  facts=None)`, `save_report(brief, reports_dir, facts=None)`. With
+  `facts=None` the output is byte-identical to today's, which keeps the
+  existing report tests meaningful and makes the renderers pure.
+- `run_weekly.run()` builds the facts map from `settings.cache_dir` plus the
+  already-loaded portfolio context and passes it through.
+
 ## 3. False positives in prose
 
 The core risk. A naive `\b[A-Z]{1,5}\b` scan across 923 tickers would annotate
@@ -142,12 +176,22 @@ they appear as ordinary English. Two defenses, applied together:
 Deliberately biased toward under-annotating: a missed tooltip is invisible, a
 wrong one is a visible bug. Approved by the user as conservative-by-design.
 
+**One rule, two consumers.** The email path (Python) and the dashboard path
+(JavaScript) must not drift into disagreeing about what counts as a ticker.
+The stoplist and the price/percent cue rule live in `vantage/tickers.py` as
+the single source of truth; `/api/tickers` carries the decision across to the
+frontend as a `common_word` boolean per entry, so the JS applies the same rule
+rather than maintaining a second list. Adding a word to the stoplist changes
+both surfaces at once.
+
 ## 4. Data flow
 
 ```
 yfinance .info ──┐
                  ├─> cache/sectors.json ──┐
-Wake holdings ───┘   (name + sector)      ├─> vantage/tickers.py ──> /api/tickers ──> prose tooltips
+Wake holdings ───┘   (name + sector)      │
+                                          ├─> vantage/tickers.py ──┬─> /api/tickers ──> prose tooltips (web)
+                                          │                        └─> expand_first_mention ──> .md / .html (email)
                                           │
 screener ──> Signal{name, sector} ──> data/signals-*.json ──> /api/signals ──> structured rows
 ```
@@ -172,7 +216,14 @@ Python (pytest, alongside the existing 51 tests):
   trip preserves both; legacy name-less entries trigger re-fetch.
 - `Signal` / `SignalSet`: a signal file written without `name` still loads.
 - `build_overview`: name reaches leaders and spikes.
-- `/api/tickers`: relevant-set scoping; empty-artifact case returns `{}`.
+- `/api/tickers`: relevant-set scoping; `common_word` flagging; empty-artifact
+  case returns `{}`.
+- `expand_first_mention`: expands on first mention only; resets per section;
+  leaves stoplisted words alone without a price cue; expands them with one;
+  `facts=None` leaves `render_markdown` / `render_html` output unchanged.
+- `report`: the emitted `.md` and `.html` carry expansions while
+  `brief-*.json` stays raw, and the `Brief` object is not mutated by
+  rendering.
 
 Frontend: no JS test harness exists in this project (all 51 tests are Python),
 so row rendering, tooltip behavior, and the absence of false-positive
@@ -180,8 +231,8 @@ annotations in a real brief are verified manually in the browser.
 
 ## 7. Out of scope
 
-- Annotating tickers in the emailed HTML brief (`vantage/report.py`) — email
-  clients handle CSS tooltips inconsistently.
 - Any change to how the analyst writes prose. This is a display layer only.
+- Rich formatting in the email beyond the inline expansion (no tooltips, no
+  per-ticker styling) — mail-client CSS support does not justify it.
 - Backfilling names into already-written `data/signals-*.json` artifacts; the
   web layer falls back to `/api/tickers` for older files.
