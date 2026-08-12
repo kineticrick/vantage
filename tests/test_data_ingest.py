@@ -132,3 +132,18 @@ def test_legacy_cache_entry_without_name_is_refetched(tmp_path):
                            _downloader=_fake_download, _info_fn=counting_info)
     assert calls["n"] == 1              # missing name => stale, re-fetched
     assert md.names["AAPL"] == "Apple Inc."
+
+def test_cached_none_name_does_not_refetch(tmp_path):
+    # A ticker with genuinely no company name (e.g. no longName/shortName in
+    # .info) caches {"name": None}. The "name" key is present -- just null --
+    # so this must NOT be treated as a pre-name-era legacy entry: re-fetching
+    # it forever would mean every no-name ticker hits yfinance on every run.
+    calls = {"n": 0}
+    def counting_info(t):
+        calls["n"] += 1
+        return _fake_info(t)
+    fetch_market_data(["ZZZZ"], cache_dir=tmp_path, batch_size=1,
+                      _downloader=_fake_download, _info_fn=counting_info)
+    fetch_market_data(["ZZZZ"], cache_dir=tmp_path, batch_size=1,
+                      _downloader=_fake_download, _info_fn=counting_info)
+    assert calls["n"] == 1              # name present-but-None => not stale

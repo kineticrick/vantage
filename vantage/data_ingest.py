@@ -66,10 +66,10 @@ def _facts_for(ticker, cache, info_fn, today):
     entry = cache.get(ticker)
     # An entry predating company names is stale regardless of age — this is how
     # the cache self-heals without a migration step.
-    if entry and "name" in entry:
+    if entry:
         try:
             age = (today - date.fromisoformat(entry["fetched"])).days
-            if age < SECTOR_TTL_DAYS:
+            if age < SECTOR_TTL_DAYS and "name" in entry:
                 return entry
         except (ValueError, KeyError, TypeError):
             pass  # malformed entry — re-fetch below

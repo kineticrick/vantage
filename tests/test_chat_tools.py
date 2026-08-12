@@ -32,6 +32,7 @@ def test_get_ticker_metrics_returns_real_numbers(tmp_path):
     out = get_ticker_metrics("MU", _settings(tmp_path),
                              _downloader=_fake_download, _info_fn=_fake_sector)
     assert out["ticker"] == "MU"
+    assert out["name"] == "Micron Technology"
     assert out["sector"] == "Technology"
     assert out["ret_12m"] is not None and out["ret_12m"] > 0
     assert out["volume_ratio"] > 1.0
