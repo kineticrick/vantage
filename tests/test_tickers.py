@@ -35,6 +35,12 @@ def test_load_cache_facts_missing_or_corrupt_returns_empty(tmp_path):
     (tmp_path / "sectors.json").write_text("{not json", encoding="utf-8")
     assert load_cache_facts(tmp_path) == {}
 
+def test_load_cache_facts_non_dict_payload_returns_empty(tmp_path):
+    (tmp_path / "sectors.json").write_text("[]", encoding="utf-8")
+    assert load_cache_facts(tmp_path) == {}
+    (tmp_path / "sectors.json").write_text("null", encoding="utf-8")
+    assert load_cache_facts(tmp_path) == {}
+
 def test_load_facts_layers_portfolio_over_cache(tmp_path):
     _write_cache(tmp_path, {"NVDA": {"sector": "Tech", "name": "NVIDIA Corp",
                                      "fetched": "2026-08-11"}})
