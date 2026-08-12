@@ -43,29 +43,31 @@ def run_screener(market_data, top_n=25, return_leader_threshold=1.0,
         vr = _volume_ratio(vol) if vol is not None else None
         if vr is not None:
             metrics["volume_ratio"] = vr
-        rows.append((ticker, market_data.sectors.get(ticker, "Unknown"), metrics))
+        rows.append((ticker, market_data.sectors.get(ticker, "Unknown"),
+                     market_data.names.get(ticker), metrics))
 
     # rank by 12m return (desc); tickers without a 12m return sort last
-    rows.sort(key=lambda r: r[2].get("ret_12m", float("-inf")), reverse=True)
+    rows.sort(key=lambda r: r[3].get("ret_12m", float("-inf")), reverse=True)
 
     signals = []
     rank = 0
-    for ticker, sector, metrics in rows:
+    for ticker, sector, name, metrics in rows:
         ret12 = metrics.get("ret_12m")
         if ret12 is not None and ret12 >= return_leader_threshold:
             rank += 1
             signals.append(Signal(ticker=ticker, signal_type="ret_12m_leader",
                                   value=ret12, rank=rank, sector=sector,
-                                  metrics=metrics))
+                                  name=name, metrics=metrics))
         vr = metrics.get("volume_ratio")
         if vr is not None and vr >= volume_spike_ratio:
             signals.append(Signal(ticker=ticker, signal_type="volume_spike",
-                                  value=vr, rank=0, sector=sector, metrics=metrics))
+                                  value=vr, rank=0, sector=sector, name=name,
+                                  metrics=metrics))
 
     signals = signals[:top_n] if top_n is not None else signals
 
     by_sector = {}
-    for _, sector, metrics in rows:
+    for _, sector, _name, metrics in rows:
         if "ret_12m" in metrics:
             by_sector.setdefault(sector, []).append(metrics["ret_12m"])
     # median, not mean — one outlier shouldn't define a sector's momentum

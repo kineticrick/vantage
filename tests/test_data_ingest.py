@@ -15,11 +15,12 @@ def _fake_download(tickers, period):
     return pd.DataFrame(data, index=idx, columns=cols)
 
 def _fake_sector(ticker):
-    return {"AAPL": "Technology", "MU": "Technology"}.get(ticker, "Unknown")
+    return {"sector": {"AAPL": "Technology", "MU": "Technology"}.get(ticker, "Unknown"),
+            "name": {"AAPL": "Apple Inc.", "MU": "Micron Technology"}.get(ticker)}
 
 def test_fetch_market_data_builds_series(tmp_path):
     md = fetch_market_data(["AAPL", "MU"], cache_dir=tmp_path, batch_size=2,
-                           _downloader=_fake_download, _sector_fn=_fake_sector)
+                           _downloader=_fake_download, _info_fn=_fake_sector)
     assert isinstance(md, MarketData)
     assert md.as_of == date.today().isoformat()
     assert "AAPL" in md.prices and len(md.prices["AAPL"]) == 5
@@ -33,9 +34,9 @@ def test_fetch_market_data_caches(tmp_path):
         calls["n"] += 1
         return _fake_download(tickers, period)
     fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
-                      _downloader=counting_download, _sector_fn=_fake_sector)
+                      _downloader=counting_download, _info_fn=_fake_sector)
     md2 = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
-                            _downloader=counting_download, _sector_fn=_fake_sector)
+                            _downloader=counting_download, _info_fn=_fake_sector)
     assert calls["n"] == 1  # second run served from cache
     assert len(md2.prices["AAPL"]) == 5
 
@@ -43,11 +44,11 @@ def test_fetch_market_data_caches_sectors(tmp_path):
     calls = {"n": 0}
     def counting_sector(t):
         calls["n"] += 1
-        return "Technology"
+        return {"sector": "Technology", "name": "Apple Inc."}
     fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
-                      _downloader=_fake_download, _sector_fn=counting_sector)
+                      _downloader=_fake_download, _info_fn=counting_sector)
     fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
-                      _downloader=_fake_download, _sector_fn=counting_sector)
+                      _downloader=_fake_download, _info_fn=counting_sector)
     assert calls["n"] == 1  # sectors served from sidecar on the second run
 
 def test_fetch_market_data_handles_flat_columns(tmp_path):
@@ -57,7 +58,7 @@ def test_fetch_market_data_handles_flat_columns(tmp_path):
                          "Volume": [1000.0] * 5}, index=idx)
     md = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
                            _downloader=lambda tickers, period: flat,
-                           _sector_fn=_fake_sector)
+                           _info_fn=_fake_sector)
     assert len(md.prices["AAPL"]) == 5
     assert md.volumes["AAPL"].iloc[0] == 1000.0
 
@@ -68,11 +69,11 @@ def test_sector_cache_is_long_lived_across_price_refresh(tmp_path):
     calls = {"n": 0}
     def counting_sector(t):
         calls["n"] += 1
-        return "Technology"
+        return {"sector": "Technology", "name": "Apple Inc."}
     fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1, period="1y",
-                      _downloader=_fake_download, _sector_fn=counting_sector)
+                      _downloader=_fake_download, _info_fn=counting_sector)
     fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1, period="6mo",
-                      _downloader=_fake_download, _sector_fn=counting_sector)
+                      _downloader=_fake_download, _info_fn=counting_sector)
     assert calls["n"] == 1  # sector not re-fetched despite a fresh price download
 
 def test_sector_cache_refetches_when_stale(tmp_path):
@@ -80,13 +81,13 @@ def test_sector_cache_refetches_when_stale(tmp_path):
     from datetime import date, timedelta
     old = (date.today() - timedelta(days=40)).isoformat()
     (tmp_path / "sectors.json").write_text(
-        json.dumps({"AAPL": {"sector": "OldSector", "fetched": old}}))
+        json.dumps({"AAPL": {"sector": "OldSector", "name": "Apple Inc.", "fetched": old}}))
     calls = {"n": 0}
     def counting_sector(t):
         calls["n"] += 1
-        return "Technology"
+        return {"sector": "Technology", "name": "Apple Inc."}
     md = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
-                           _downloader=_fake_download, _sector_fn=counting_sector)
+                           _downloader=_fake_download, _info_fn=counting_sector)
     assert calls["n"] == 1                  # stale entry -> re-fetched
     assert md.sectors["AAPL"] == "Technology"
 
@@ -98,3 +99,36 @@ def test_fetch_default_period_exceeds_12mo_window():
     default = inspect.signature(fetch_market_data).parameters["period"].default
     assert default not in ("1y", "ytd", "6mo", "3mo", "1mo"), \
         f"period {default!r} too short for the 252-day screener window"
+
+def _fake_info(ticker):
+    return {"AAPL": {"sector": "Technology", "name": "Apple Inc."},
+            "MU": {"sector": "Technology", "name": "Micron Technology"}}.get(
+                ticker, {"sector": "Unknown", "name": None})
+
+def test_fetch_market_data_captures_names(tmp_path):
+    md = fetch_market_data(["AAPL", "MU"], cache_dir=tmp_path, batch_size=2,
+                           _downloader=_fake_download, _info_fn=_fake_info)
+    assert md.names["AAPL"] == "Apple Inc."
+    assert md.sectors["MU"] == "Technology"
+
+def test_name_survives_cache_round_trip(tmp_path):
+    fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                      _downloader=_fake_download, _info_fn=_fake_info)
+    md2 = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                            _downloader=_fake_download, _info_fn=_fake_info)
+    assert md2.names["AAPL"] == "Apple Inc."
+
+def test_legacy_cache_entry_without_name_is_refetched(tmp_path):
+    import json
+    from datetime import date
+    # A fresh-by-age entry from before names existed.
+    (tmp_path / "sectors.json").write_text(json.dumps(
+        {"AAPL": {"sector": "Technology", "fetched": date.today().isoformat()}}))
+    calls = {"n": 0}
+    def counting_info(t):
+        calls["n"] += 1
+        return _fake_info(t)
+    md = fetch_market_data(["AAPL"], cache_dir=tmp_path, batch_size=1,
+                           _downloader=_fake_download, _info_fn=counting_info)
+    assert calls["n"] == 1              # missing name => stale, re-fetched
+    assert md.names["AAPL"] == "Apple Inc."
