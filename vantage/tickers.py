@@ -6,6 +6,7 @@ Wake holdings (authoritative for what they own, and the only source that
 names their ETFs) and the yfinance-derived cache written by data_ingest.
 """
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -61,3 +62,67 @@ def load_facts(cache_dir, portfolio=None) -> dict:
 def resolve(ticker, facts) -> TickerFacts:
     """Never raises — an unknown ticker resolves to bare facts."""
     return facts.get(ticker) or TickerFacts(ticker=ticker)
+
+
+# --- Prose detection -------------------------------------------------------
+# Tickers that are also ordinary English words. Annotating these on sight
+# would light up normal prose ("it", "all", "on"), so they are skipped unless
+# the surrounding text carries a price/percent cue. Biased toward
+# under-annotating: a missed tooltip is invisible, a wrong one is a bug.
+COMMON_WORD_TICKERS = frozenset({
+    "ALL", "ANY", "ARE", "BIG", "CAR", "CARS", "CAT", "EAT", "EDIT", "FAST",
+    "FIX", "FOR", "FUN", "GO", "GOOD", "HAS", "HE", "IT", "JOB", "KEY", "LOVE",
+    "MAIN", "NEW", "NOW", "ON", "ONE", "OPEN", "OUT", "PLAY", "REAL", "RUN",
+    "SEE", "SO", "TRUE", "TWO", "UP", "WELL", "YOU",
+})
+
+# A symbol: 1-5 uppercase alphanumerics, optionally a class suffix (BRK-B).
+TICKER_RE = re.compile(r"\b[A-Z][A-Z0-9]{0,4}(?:-[A-Z])?\b")
+
+# A price/percent cue immediately after a symbol: "+32%", "$214", "is 12".
+_CUE_RE = re.compile(r"^\s*(?:is\s+|at\s+)?[+\-]?\$?\d")
+
+
+def is_common_word(ticker) -> bool:
+    return str(ticker).upper() in COMMON_WORD_TICKERS
+
+
+def _has_price_cue(text, end) -> bool:
+    return bool(_CUE_RE.match(text[end:end + 12]))
+
+
+def find_mentions(text, facts) -> list:
+    """Spans of ticker mentions we are confident about, left to right."""
+    text = text or ""
+    out = []
+    for m in TICKER_RE.finditer(text):
+        t = m.group(0)
+        if t not in facts:
+            continue
+        if is_common_word(t) and not _has_price_cue(text, m.end()):
+            continue
+        out.append((m.start(), m.end(), t))
+    return out
+
+
+def expand_first_mention(text, facts, seen=None) -> str:
+    """Append "(Name, Sector)" after the first mention of each ticker.
+
+    `seen` is shared across calls that belong to the same section, so a name
+    is not repeated within one section but is reintroduced in the next.
+    """
+    text = text or ""
+    seen = seen if seen is not None else set()
+    parts, last = [], 0
+    for start, end, t in find_mentions(text, facts):
+        if t in seen:
+            continue
+        detail = resolve(t, facts).subtitle(sep=", ")
+        if not detail:
+            continue
+        seen.add(t)
+        parts.append(text[last:end])
+        parts.append(f" ({detail})")
+        last = end
+    parts.append(text[last:])
+    return "".join(parts)
