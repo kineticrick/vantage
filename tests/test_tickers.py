@@ -1,4 +1,8 @@
 import json
+from pathlib import Path
+
+import pytest
+
 from vantage.models import PortfolioContext, Holding
 from vantage.tickers import TickerFacts, load_cache_facts, load_facts, resolve
 from vantage.tickers import (COMMON_WORD_TICKERS, is_common_word,
@@ -132,3 +136,52 @@ def test_expand_first_mention_leaves_unknown_text_untouched():
 def test_expand_first_mention_handles_empty_text():
     assert expand_first_mention("", _FACTS) == ""
     assert expand_first_mention(None, _FACTS) == ""
+
+def test_single_char_symbols_need_a_price_cue():
+    facts = {"A": TickerFacts("A", "Agilent Technologies", "Healthcare"),
+             "T": TickerFacts("T", "AT&T", "Communication Services")}
+    # sentence-initial "A" is the highest-frequency false positive
+    assert find_mentions("A credible US foundry alternative", facts) == []
+    assert find_mentions("T said little", facts) == []
+    # a price cue still lets a real 1-char mention through
+    assert [t for _, _, t in find_mentions("A +12% on the week", facts)] == ["A"]
+
+# --- Regression over the real corpus ---------------------------------------
+# The invented-sentence tests above cannot catch a stoplist that was written
+# from imagination. reports/ and cache/ are git-ignored, so this skips on a
+# fresh clone rather than silently passing.
+_ROOT = Path(__file__).resolve().parents[1]
+_REAL_BRIEF = _ROOT / "reports" / "brief-2026-08-11.json"
+_REAL_CACHE = _ROOT / "cache"
+
+def _real_brief_text(brief) -> str:
+    parts = [brief.get("executive_summary") or "", brief.get("challenge") or "",
+             brief.get("what_im_missing") or ""]
+    for i in brief.get("items") or []:
+        parts += [i.get(k) or "" for k in
+                  ("title", "thesis", "evidence", "why_it_matters",
+                   "portfolio_relevance")]
+    parts += [w or "" for w in brief.get("watchlist") or []]
+    return "\n".join(parts)
+
+@pytest.mark.skipif(
+    not (_REAL_BRIEF.exists() and (_REAL_CACHE / "sectors.json").exists()),
+    reason="needs the git-ignored real brief and ticker cache")
+def test_find_mentions_on_real_brief_has_no_english_word_false_positives():
+    facts = load_cache_facts(_REAL_CACHE)
+    text = _real_brief_text(json.loads(_REAL_BRIEF.read_text(encoding="utf-8")))
+    found = {t for _, _, t in find_mentions(text, facts)}
+    # Observed false positives: "A credible…", "PERSONAL GAP:", "actually LOW".
+    assert {"A", "GAP", "LOW"} & found == set()
+    # …without over-correcting: genuine mentions still annotate.
+    assert {"MU", "WDC", "LITE", "NVDA", "PBF"} <= found
+
+@pytest.mark.skipif(not (_ROOT / "config" / "universe.txt").exists(),
+                    reason="needs config/universe.txt")
+def test_common_word_stoplist_has_no_dead_entries():
+    """Entries that can never match disguise an unmaintained list."""
+    from vantage.universe import load_universe
+    universe = set(load_universe(_ROOT / "config" / "universe.txt"))
+    # PLAY is a documented exception: a real listed symbol not in this
+    # universe today, kept because "a pure AI PLAY" is high-frequency prose.
+    assert (COMMON_WORD_TICKERS - universe) == {"PLAY"}

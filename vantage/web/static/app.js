@@ -33,9 +33,11 @@ function cell(main, name, sector, ticker) {
 
 // Mirrors vantage/tickers.py: same symbol shape, same price-cue rule. The
 // stoplist verdict arrives per-ticker as `common_word` so there is only one
-// list, maintained in Python.
+// list, maintained in Python. The 1-character rule is a rule, not a list, so
+// it lives here too — mirrors tickers._needs_price_cue.
 const TK_RE = /\b[A-Z][A-Z0-9]{0,4}(?:-[A-Z])?\b/g;
 const CUE_RE = /^\s*(?:is\s+|at\s+)?[+\-]?\$?\d/;
+const needsCue = (t, f) => t.length === 1 || !!f.common_word;
 
 // `facts` defaults to the module-level FACTS (overview, chat) but callers
 // scoped to a specific, non-latest brief (openBrief) pass their own map.
@@ -48,7 +50,7 @@ function annotate(text, facts = FACTS) {
     const f = facts[m[0]];
     if (!f) continue;
     const end = m.index + m[0].length;
-    if (f.common_word && !CUE_RE.test(s.slice(end, end + 12))) continue;
+    if (needsCue(m[0], f) && !CUE_RE.test(s.slice(end, end + 12))) continue;
     const tip = [f.name, f.sector].filter(Boolean).join(" · ");
     if (!tip) continue;
     frag.appendChild(document.createTextNode(s.slice(last, m.index)));

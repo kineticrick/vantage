@@ -69,11 +69,30 @@ def resolve(ticker, facts) -> TickerFacts:
 # would light up normal prose ("it", "all", "on"), so they are skipped unless
 # the surrounding text carries a price/percent cue. Biased toward
 # under-annotating: a missed tooltip is invisible, a wrong one is a bug.
+#
+# Derived from the real universe, not from imagination: every entry below
+# except PLAY is present in config/universe.txt (915 symbols, == cache/
+# sectors.json), intersected with /usr/share/dict/american-english and then
+# hand-judged. Since TICKER_RE only matches all-caps tokens, the risk is not
+# "gap" in ordinary lowercase prose but a word SHOUTED for emphasis or used in
+# a heading — which is exactly how the analyst writes ("FLAG + PERSONAL GAP",
+# "ratios are actually LOW"). Symbols that are dictionary words but implausible
+# as all-caps prose are deliberately left out so genuine mentions still
+# annotate: ONTO, LITE, META, DELL, MU, COIN, APP, ALLY, KEYS, FANG, UPS, TAP.
+# PLAY (Dave & Buster's) is the one entry not currently in the universe; it is
+# kept because "a pure AI PLAY" is high-frequency prose and the universe is a
+# user-editable config file.
+# Keep this a literal: it must be deterministic and identical for consumers
+# that have no cache on disk.
 COMMON_WORD_TICKERS = frozenset({
-    "ALL", "ANY", "ARE", "BIG", "CAR", "CARS", "CAT", "EAT", "EDIT", "FAST",
-    "FIX", "FOR", "FUN", "GO", "GOOD", "HAS", "HE", "IT", "JOB", "KEY", "LOVE",
-    "MAIN", "NEW", "NOW", "ON", "ONE", "OPEN", "OUT", "PLAY", "REAL", "RUN",
-    "SEE", "SO", "TRUE", "TWO", "UP", "WELL", "YOU",
+    # articles, pronouns, verbs, prepositions
+    "A", "ALL", "AM", "AN", "ARE", "HAS", "IT", "ON", "SO",
+    # nouns/adjectives that get capitalized for emphasis or in headings
+    "ARM", "BALL", "BILL", "CAR", "CART", "CAT", "COST", "DASH", "FAST",
+    "FIVE", "FIX", "FLEX", "FOUR", "GAP", "GEN", "HOOD", "ICE", "KEY", "LOW",
+    "NOW", "PATH", "PLAY", "POST", "SHOP", "TECH", "WELL",
+    # financial abbreviations that collide with a symbol
+    "AMT", "COO", "MTD", "PEG", "SAM",
 })
 
 # A symbol: 1-5 uppercase alphanumerics, optionally a class suffix (BRK-B).
@@ -91,6 +110,16 @@ def _has_price_cue(text, end) -> bool:
     return bool(_CUE_RE.match(text[end:end + 12]))
 
 
+def _needs_price_cue(ticker) -> bool:
+    """Symbols that must be corroborated by a nearby price/percent.
+
+    Every 1-character symbol qualifies unconditionally: a lone capital letter
+    is far more often a sentence-initial "A", an initial, or a list marker than
+    a ticker, and no 1-char symbol is safe bare. Mirrored in app.js.
+    """
+    return len(str(ticker)) == 1 or is_common_word(ticker)
+
+
 def find_mentions(text, facts) -> list:
     """Spans of ticker mentions we are confident about, left to right."""
     text = text or ""
@@ -99,7 +128,7 @@ def find_mentions(text, facts) -> list:
         t = m.group(0)
         if t not in facts:
             continue
-        if is_common_word(t) and not _has_price_cue(text, m.end()):
+        if _needs_price_cue(t) and not _has_price_cue(text, m.end()):
             continue
         out.append((m.start(), m.end(), t))
     return out
