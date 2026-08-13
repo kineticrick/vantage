@@ -26,9 +26,10 @@ function sub(name, sector) {
 // absent, fall back to the module-level FACTS map (already loaded from
 // /api/tickers before any panel renders). Covers rows sourced from artifacts
 // written before the `name` field existed (e.g. old data/signals-*.json).
+// `main` is plain text: cell() escapes it, so no call site has to remember to.
 function cell(main, name, sector, ticker) {
   const f = (ticker && FACTS[ticker]) || {};
-  return `<div class="cell"><span>${main}</span>${sub(name || f.name, sector || f.sector)}</div>`;
+  return `<div class="cell"><span>${esc(main)}</span>${sub(name || f.name, sector || f.sector)}</div>`;
 }
 
 // Mirrors vantage/tickers.py: same symbol shape, same price-cue rule. The
@@ -83,7 +84,7 @@ async function loadOverview() {
     <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
     ${rows(o.top_leaders, (l) => `<div class="row">
-      ${cell(esc(l.ticker), l.name, l.sector, l.ticker)}
+      ${cell(l.ticker, l.name, l.sector, l.ticker)}
       <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
     <div class="label">Sector momentum</div>
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
@@ -106,7 +107,7 @@ async function loadPortfolio() {
     ${rows(p.holdings.slice().sort((a, b) => (b.pct_of_portfolio || 0) -
         (a.pct_of_portfolio || 0)).slice(0, 8),
       (h) => `<div class="row">
-        ${cell(esc(h.ticker), h.name, h.sector, h.ticker)}
+        ${cell(h.ticker, h.name, h.sector, h.ticker)}
         <span>${pct(h.pct_of_portfolio)}</span></div>`)}`;
 }
 
@@ -114,7 +115,8 @@ async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
     ${rows(s.signals, (sig) => `<div class="row">
-      ${cell(esc(sig.ticker) + " · " + esc(sig.signal_type), sig.name, sig.sector, sig.ticker)}
+      ${cell([sig.ticker, sig.signal_type].filter(Boolean).join(" · "),
+             sig.name, sig.sector, sig.ticker)}
       <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
         ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
 }
@@ -255,21 +257,27 @@ $("chat-form").addEventListener("submit", async (e) => {
   if (!msg) return;
   addMsg("user", msg);
   input.value = "";
+  // A reply interleaves text with tool calls, so it can own several bubbles.
+  // Keep every one: `bubble` is only the open (still-appending) one, while
+  // `bubbles` accumulates them all for annotation once the stream is done.
   let bubble = null;
+  const bubbles = [];
   try {
     await streamPost("/api/chat", { message: msg }, (ev) => {
       if (ev.type === "text") {
-        if (!bubble) bubble = addMsg("analyst", "");
+        if (!bubble) { bubble = addMsg("analyst", ""); bubbles.push(bubble); }
         bubble.textContent += ev.text;
         $("chat-log").scrollTop = $("chat-log").scrollHeight;
       } else if (ev.type === "tool_use") {
         addMsg("tool", `[looking up via ${ev.name}(${JSON.stringify(ev.input || {})})]`);
-        bubble = null;
+        bubble = null;   // next text starts a new bubble; this one is finished
       } else if (ev.type === "error") {
         addMsg("error", `[error: ${ev.message}]`);
       }
     });
-    if (bubble) bubble.replaceChildren(annotate(bubble.textContent));
+    // Annotate only after the stream ends — never mid-stream, or appending
+    // text would land inside/after the elements annotate() just built.
+    for (const b of bubbles) b.replaceChildren(annotate(b.textContent));
   } catch (e) {
     addMsg("error", "[error: " + e + "]");
   }
