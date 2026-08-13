@@ -9,6 +9,7 @@ from vantage.portfolio_context import load_portfolio_context
 from vantage.analyst import generate_brief
 from vantage.report import save_report, render_html
 from vantage.deliver import send_email
+from vantage.tickers import load_facts
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,9 @@ def run(settings=None, _market_data_fn=None, _portfolio_fn=None,
         logger.warning("Analyst step failed: %s — sending fallback brief", e)
         brief = _fallback_brief(signal_set, str(e))
 
-    path = save_report(brief, s.reports_dir)  # writes .md, .html, .json
-    html = render_html(brief)
+    facts = load_facts(s.cache_dir, portfolio)
+    path = save_report(brief, s.reports_dir, facts=facts)  # writes .md, .html, .json
+    html = render_html(brief, facts=facts)
     subject = f"Blind-Spot Radar — Weekly Brief ({brief.as_of})"
     send = _send_fn or (lambda subject, html, st: send_email(subject, html, st))
     send(subject, html, s)
