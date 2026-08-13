@@ -86,3 +86,19 @@ def test_relevant_ticker_facts_scopes_and_flags():
     assert out["MU"]["name"] == "Micron Technology"
     assert out["ALL"]["common_word"] is True          # JS applies the cue rule
     assert out["MU"]["common_word"] is False
+
+def test_relevant_ticker_facts_scans_item_fields():
+    # Ticker appears only inside a BriefItem field (thesis) — nowhere in the
+    # top-level prose (executive_summary/challenge/what_im_missing/watchlist)
+    # — so this only passes if _brief_text's loop over brief.items runs.
+    from vantage.models import SignalSet, Brief, BriefItem
+    from vantage.tickers import TickerFacts
+    from vantage.web.artifacts import relevant_ticker_facts
+    facts = {"AVGO": TickerFacts("AVGO", "Broadcom Inc", "Technology")}
+    ss = SignalSet("2026-08-12", [], {})
+    item = BriefItem(title="Semis", thesis="AVGO is accelerating.",
+                     evidence="", why_it_matters="", portfolio_relevance="")
+    b = Brief("2026-08-12", "no tickers in this summary", [item], [], "", "", "d")
+    out = relevant_ticker_facts(facts, ss, None, b)
+    assert out == {"AVGO": {"name": "Broadcom Inc", "sector": "Technology",
+                            "common_word": False}}
