@@ -22,8 +22,13 @@ function sub(name, sector) {
   return t ? `<div class="sub">${esc(t)}</div>` : "";
 }
 
-function cell(main, name, sector) {
-  return `<div class="cell"><span>${main}</span>${sub(name, sector)}</div>`;
+// `ticker` (raw, unescaped) is optional; when a row's own name/sector are
+// absent, fall back to the module-level FACTS map (already loaded from
+// /api/tickers before any panel renders). Covers rows sourced from artifacts
+// written before the `name` field existed (e.g. old data/signals-*.json).
+function cell(main, name, sector, ticker) {
+  const f = (ticker && FACTS[ticker]) || {};
+  return `<div class="cell"><span>${main}</span>${sub(name || f.name, sector || f.sector)}</div>`;
 }
 
 // Mirrors vantage/tickers.py: same symbol shape, same price-cue rule. The
@@ -76,7 +81,7 @@ async function loadOverview() {
     <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
     ${rows(o.top_leaders, (l) => `<div class="row">
-      ${cell(esc(l.ticker), l.name, l.sector)}
+      ${cell(esc(l.ticker), l.name, l.sector, l.ticker)}
       <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
     <div class="label">Sector momentum</div>
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
@@ -99,7 +104,7 @@ async function loadPortfolio() {
     ${rows(p.holdings.slice().sort((a, b) => (b.pct_of_portfolio || 0) -
         (a.pct_of_portfolio || 0)).slice(0, 8),
       (h) => `<div class="row">
-        ${cell(esc(h.ticker), h.name, h.sector)}
+        ${cell(esc(h.ticker), h.name, h.sector, h.ticker)}
         <span>${pct(h.pct_of_portfolio)}</span></div>`)}`;
 }
 
@@ -107,7 +112,7 @@ async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
     ${rows(s.signals, (sig) => `<div class="row">
-      ${cell(esc(sig.ticker) + " · " + esc(sig.signal_type), sig.name, sig.sector)}
+      ${cell(esc(sig.ticker) + " · " + esc(sig.signal_type), sig.name, sig.sector, sig.ticker)}
       <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
         ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
 }
