@@ -134,8 +134,14 @@ def find_mentions(text, facts) -> list:
     return out
 
 
+# Most S&P names carry a ", Inc." suffix, so a comma cannot separate the name
+# from the sector — "MU (Micron Technology, Inc., Technology)" hides the seam.
+# An em dash never occurs inside a company name and reads in .md and .html alike.
+EXPANSION_SEP = " — "
+
+
 def expand_first_mention(text, facts, seen=None) -> str:
-    """Append "(Name, Sector)" after the first mention of each ticker.
+    """Append "(Name — Sector)" after the first mention of each ticker.
 
     `seen` is shared across calls that belong to the same section, so a name
     is not repeated within one section but is reintroduced in the next.
@@ -146,7 +152,7 @@ def expand_first_mention(text, facts, seen=None) -> str:
     for start, end, t in find_mentions(text, facts):
         if t in seen:
             continue
-        detail = resolve(t, facts).subtitle(sep=", ")
+        detail = resolve(t, facts).subtitle(sep=EXPANSION_SEP)
         if not detail:
             continue
         seen.add(t)

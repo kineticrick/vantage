@@ -68,9 +68,9 @@ def test_render_markdown_without_facts_is_unchanged():
 
 def test_render_markdown_expands_first_mention():
     md = render_markdown(_brief(), facts=_FACTS)
-    assert "MU (Micron Technology, Technology)" in md
-    assert "WDC (Western Digital, Technology)" in md      # challenge section
-    assert "NVDA (NVIDIA Corporation, Technology)" in md  # watchlist
+    assert "MU (Micron Technology — Technology)" in md
+    assert "WDC (Western Digital — Technology)" in md      # challenge section
+    assert "NVDA (NVIDIA Corporation — Technology)" in md  # watchlist
 
 def test_render_html_expands_and_still_escapes():
     from vantage.models import Brief, BriefItem
@@ -78,7 +78,7 @@ def test_render_html_expands_and_still_escapes():
               items=[], watchlist=[], challenge="", what_im_missing="",
               disclaimer="d")
     html = render_html(b, facts=_FACTS)
-    assert "MU (Micron Technology, Technology)" in html
+    assert "MU (Micron Technology — Technology)" in html
     assert "<script>" not in html and "&lt;script&gt;" in html
 
 def test_expansion_resets_between_sections():
@@ -87,7 +87,7 @@ def test_expansion_resets_between_sections():
               items=[], watchlist=[], challenge="MU again",
               what_im_missing="", disclaimer="d")
     md = render_markdown(b, facts=_FACTS)
-    assert md.count("MU (Micron Technology, Technology)") == 2
+    assert md.count("MU (Micron Technology — Technology)") == 2
 
 def test_save_report_annotates_md_and_html_but_not_json(tmp_path):
     import json
@@ -112,4 +112,4 @@ def test_expansion_shared_across_fields_within_one_item():
                                sources=[], why_it_matters="", portfolio_relevance="")],
               watchlist=[], challenge="", what_im_missing="", disclaimer="d")
     md = render_markdown(b, facts=_FACTS)
-    assert md.count("MU (Micron Technology, Technology)") == 1
+    assert md.count("MU (Micron Technology — Technology)") == 1

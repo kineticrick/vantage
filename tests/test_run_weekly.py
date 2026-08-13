@@ -145,6 +145,6 @@ def test_run_weekly_expands_ticker_names_in_html_and_markdown(tmp_path):
         _analyst_fn=lambda ss, pcx, interests, st: brief,
         _send_fn=lambda subject, html, st: sent.update({"html": html}),
     )
-    expanded = "MU (Micron Technology, Technology)"
+    expanded = "MU (Micron Technology — Technology)"
     assert expanded in sent["html"]
     assert expanded in Path(path).read_text(encoding="utf-8")

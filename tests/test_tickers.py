@@ -108,7 +108,7 @@ def test_find_mentions_handles_dotted_class_shares():
 
 def test_expand_first_mention_expands_once():
     out = expand_first_mention("MU rose, then MU fell", _FACTS)
-    assert out == "MU (Micron Technology, Technology) rose, then MU fell"
+    assert out == "MU (Micron Technology — Technology) rose, then MU fell"
 
 def test_expand_first_mention_shares_seen_across_calls():
     seen = set()
