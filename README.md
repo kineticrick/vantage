@@ -101,11 +101,11 @@ an analyst chat docked on the right.
 - **Data panels** read the latest artifacts from `data/` and `reports/` — no
   re-run needed. If no artifacts are present yet, panels show "None" /
   "Unavailable" without errors.
-- **Ticker identity** — every ticker on the dashboard (Overview leaders,
-  Signals, Portfolio positions) shows its company name and sector beneath it.
-  Tickers mentioned inside brief prose, the watchlist, and chat replies carry
-  a hover/focus tooltip with the same information instead, so identity is
-  available without a separate lookup.
+- **Ticker identity** — tickers on the dashboard (Overview leaders, Signals,
+  Portfolio positions) show company name and sector beneath them when known,
+  degrading to whichever part is available (a lookup can fail or an entry can
+  lack a name). Tickers mentioned inside brief prose, the watchlist, and chat
+  replies carry a hover/focus tooltip with the same information instead.
 - **Refresh data** re-runs the full quantitative pipeline (market fetch →
   screener → portfolio context) and reloads all panels on completion. This
   makes real market-data requests and takes a few minutes.
