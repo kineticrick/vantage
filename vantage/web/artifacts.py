@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from vantage.models import SignalSet, Brief
+from vantage.tickers import TICKER_RE, is_common_word, resolve
 
 def latest_signals(data_dir):
     files = sorted(Path(data_dir).glob("signals-*.json"))
@@ -29,7 +30,8 @@ def build_overview(signal_set, portfolio, latest_brief):
     leaders, spikes = [], []
     if signal_set:
         for s in signal_set.signals:
-            entry = {"ticker": s.ticker, "value": s.value, "sector": s.sector}
+            entry = {"ticker": s.ticker, "value": s.value, "sector": s.sector,
+                     "name": s.name}
             if s.signal_type == "ret_12m_leader":
                 leaders.append(entry)
             elif s.signal_type == "volume_spike":
@@ -58,3 +60,37 @@ def build_overview(signal_set, portfolio, latest_brief):
                           "executive_summary": latest_brief.executive_summary}
                          if latest_brief else None),
     }
+
+
+def _brief_text(brief) -> str:
+    """All prose in a brief, concatenated — used to scope the ticker map."""
+    parts = [brief.executive_summary or "", brief.challenge or "",
+             brief.what_im_missing or "", " ".join(brief.watchlist or [])]
+    for i in brief.items:
+        parts += [i.title or "", i.thesis or "", i.evidence or "",
+                  i.why_it_matters or "", i.portfolio_relevance or ""]
+    return " ".join(parts)
+
+
+def relevant_ticker_facts(facts, signal_set, portfolio, brief) -> dict:
+    """Facts for tickers actually on screen — not the whole 900+ universe.
+
+    Narrow scope is the primary defense against annotating English words that
+    happen to be tickers: a symbol the user is not looking at is never a
+    candidate. The `common_word` flag carries the stoplist verdict to the
+    frontend so the JS applies the same rule instead of keeping its own list.
+    """
+    keys = set()
+    if signal_set:
+        keys |= {s.ticker for s in signal_set.signals}
+    if portfolio is not None and getattr(portfolio, "available", False):
+        keys |= {h.ticker for h in portfolio.holdings if h.ticker}
+    if brief is not None:
+        keys |= {m.group(0) for m in TICKER_RE.finditer(_brief_text(brief))
+                 if m.group(0) in facts}
+    out = {}
+    for t in sorted(keys):
+        f = resolve(t, facts)
+        out[t] = {"name": f.name, "sector": f.sector,
+                  "common_word": is_common_word(t)}
+    return out

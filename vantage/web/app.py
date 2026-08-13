@@ -63,6 +63,16 @@ def create_app(settings=None, conversation_factory=None,
             return JSONResponse({"error": "not found"}, status_code=404)
         return {"brief": b.to_dict(), "html": art.read_brief_html(s.reports_dir, as_of)}
 
+    @app.get("/api/tickers")
+    def tickers():
+        from vantage.tickers import load_facts
+        s = app.state.settings
+        pf = app.state.portfolio_loader(s.portfolio_analysis_path)
+        ss = art.latest_signals(s.data_dir)
+        briefs = art.list_briefs(s.reports_dir)
+        latest = art.load_brief(s.reports_dir, briefs[0]["as_of"]) if briefs else None
+        return art.relevant_ticker_facts(load_facts(s.cache_dir, pf), ss, pf, latest)
+
     def _get_conversation():
         if app.state.conversation is None:
             app.state.conversation = app.state.conversation_factory(app.state.settings)

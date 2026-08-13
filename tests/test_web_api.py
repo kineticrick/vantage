@@ -59,3 +59,21 @@ def test_briefs_list_and_fetch_and_404(tmp_path):
     assert one["brief"]["watchlist"] == ["MU"]
     assert one["html"] == "<h1>Brief</h1>"
     assert c.get("/api/briefs/2099-01-01").status_code == 404
+
+def test_tickers_endpoint(tmp_path):
+    s = _settings(tmp_path); _seed(s)
+    (s.cache_dir / "sectors.json").write_text(json.dumps(
+        {"NVDA": {"sector": "Technology", "name": "NVIDIA Corporation",
+                  "fetched": "2026-08-11"},
+         "MU": {"sector": "Technology", "name": "Micron Technology",
+                "fetched": "2026-08-11"}}))
+    r = _client(s).get("/api/tickers")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["NVDA"]["name"] == "Nvidia"   # in signals + holdings; holding name wins over cache
+    assert body["MU"]["sector"] == "Technology"           # in the brief watchlist
+    assert body["MU"]["common_word"] is False
+
+def test_tickers_endpoint_empty_when_no_artifacts(tmp_path):
+    s = _settings(tmp_path)
+    assert _client(s, available=False).get("/api/tickers").json() == {}
