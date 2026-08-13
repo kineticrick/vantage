@@ -9,6 +9,7 @@ class Signal:
     value: float
     rank: int
     sector: str | None = None
+    name: str | None = None
     metrics: dict = field(default_factory=dict)
 
 @dataclass
@@ -33,11 +34,11 @@ class SignalSet:
         )
 
     def save(self, path) -> None:
-        Path(path).write_text(json.dumps(self.to_dict(), indent=2))
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
 
     @staticmethod
     def load(path) -> "SignalSet":
-        return SignalSet.from_dict(json.loads(Path(path).read_text()))
+        return SignalSet.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
 
 @dataclass
 class Holding:

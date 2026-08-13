@@ -2,15 +2,16 @@ from vantage.data_ingest import fetch_market_data
 from vantage.screener import _WINDOWS, _trailing_return, _volume_ratio, run_screener
 from vantage.universe import load_universe
 
-def get_ticker_metrics(ticker, settings, _downloader=None, _sector_fn=None) -> dict:
+def get_ticker_metrics(ticker, settings, _downloader=None, _info_fn=None) -> dict:
     ticker = ticker.upper().strip()
     try:
         md = fetch_market_data([ticker], cache_dir=settings.cache_dir,
-                               _downloader=_downloader, _sector_fn=_sector_fn)
+                               _downloader=_downloader, _info_fn=_info_fn)
         prices = md.prices.get(ticker)
         if prices is None or len(prices) == 0:
             return {"ticker": ticker, "error": "no price data found"}
-        out = {"ticker": ticker, "sector": md.sectors.get(ticker, "Unknown")}
+        out = {"ticker": ticker, "name": md.names.get(ticker),
+               "sector": md.sectors.get(ticker, "Unknown")}
         for name, lb in _WINDOWS.items():
             out[name] = _trailing_return(prices, lb)
         vol = md.volumes.get(ticker)

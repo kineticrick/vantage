@@ -14,19 +14,22 @@ class MarketData:
     prices: dict = field(default_factory=dict)
     volumes: dict = field(default_factory=dict)
     sectors: dict = field(default_factory=dict)
+    names: dict = field(default_factory=dict)
 
 def _default_downloader(tickers, period):
     import yfinance as yf
     return yf.download(tickers, period=period, auto_adjust=True,
                        progress=False, group_by="column")
 
-def _default_sector_fn(ticker):
+def _default_info_fn(ticker):
+    """Sector and company name from one .info call (the name used to be discarded)."""
     import yfinance as yf
     try:
         info = yf.Ticker(ticker).info
-        return info.get("sector") or "Unknown"
+        return {"sector": info.get("sector") or "Unknown",
+                "name": info.get("longName") or info.get("shortName") or None}
     except Exception:
-        return "Unknown"
+        return {"sector": "Unknown", "name": None}
 
 def _batch_cache_path(cache_dir, batch, period):
     key = hashlib.sha1(
@@ -50,39 +53,42 @@ def _load_sector_cache(cache_dir) -> dict:
     p = _sector_cache_path(cache_dir)
     if p.exists():
         try:
-            return json.loads(p.read_text())
+            return json.loads(p.read_text(encoding="utf-8"))
         except (ValueError, OSError):
             return {}
     return {}
 
 def _save_sector_cache(cache_dir, data) -> None:
-    _sector_cache_path(cache_dir).write_text(json.dumps(data))
+    _sector_cache_path(cache_dir).write_text(json.dumps(data), encoding="utf-8")
 
-def _sector_for(ticker, cache, sector_fn, today):
-    """Return the ticker's sector, fetching (and caching) only if absent or stale."""
+def _facts_for(ticker, cache, info_fn, today):
+    """Cached {sector, name}, re-fetching when absent, aged out, or name-less."""
     entry = cache.get(ticker)
+    # An entry predating company names is stale regardless of age — this is how
+    # the cache self-heals without a migration step.
     if entry:
         try:
             age = (today - date.fromisoformat(entry["fetched"])).days
-            if age < SECTOR_TTL_DAYS:
-                return entry["sector"]
+            if age < SECTOR_TTL_DAYS and "name" in entry:
+                return entry
         except (ValueError, KeyError, TypeError):
             pass  # malformed entry — re-fetch below
-    sector = sector_fn(ticker)
-    cache[ticker] = {"sector": sector, "fetched": today.isoformat()}
-    return sector
+    info = info_fn(ticker)
+    cache[ticker] = {"sector": info.get("sector") or "Unknown",
+                     "name": info.get("name"), "fetched": today.isoformat()}
+    return cache[ticker]
 
 def fetch_market_data(tickers, cache_dir, batch_size=100, period="2y",
-                      _downloader=None, _sector_fn=None) -> MarketData:
+                      _downloader=None, _info_fn=None) -> MarketData:
     # period must exceed the screener's longest lookback (252 trading days for
     # the 12-month return). "1y" (~252 sessions) is one session too short and
     # silently yields no 12mo leaders / empty sector momentum — keep >= "2y".
     downloader = _downloader or _default_downloader
-    sector_fn = _sector_fn or _default_sector_fn
+    info_fn = _info_fn or _default_info_fn
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     today = date.today()
     sector_cache = _load_sector_cache(cache_dir)
-    prices, volumes, sectors = {}, {}, {}
+    prices, volumes, sectors, names = {}, {}, {}, {}
     for i in range(0, len(tickers), batch_size):
         batch = tickers[i:i + batch_size]
         cpath = _batch_cache_path(cache_dir, batch, period)
@@ -101,11 +107,13 @@ def fetch_market_data(tickers, cache_dir, batch_size=100, period="2y",
                 continue
             prices[t] = p
             volumes[t] = v
-            sectors[t] = _sector_for(t, sector_cache, sector_fn, today)
+            facts = _facts_for(t, sector_cache, info_fn, today)
+            sectors[t] = facts.get("sector") or "Unknown"
+            names[t] = facts.get("name")
             present += 1
         logger.info("Batch %d: %d/%d tickers loaded", i // batch_size, present, len(batch))
     _save_sector_cache(cache_dir, sector_cache)
     if not prices:
         logger.warning("fetch_market_data produced no price series (empty MarketData)")
     return MarketData(as_of=today.isoformat(),
-                      prices=prices, volumes=volumes, sectors=sectors)
+                      prices=prices, volumes=volumes, sectors=sectors, names=names)

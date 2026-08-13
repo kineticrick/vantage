@@ -4,10 +4,78 @@ const cls = (v) => (v >= 0 ? "up" : "down");
 const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
   (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+// Ticker facts for prose annotation, scoped server-side to what's on screen.
+let FACTS = {};
+async function loadFacts() {
+  try { FACTS = await getJSON("/api/tickers"); } catch (e) { FACTS = {}; }
+}
+
 async function getJSON(url) { const r = await fetch(url); return r.json(); }
 
 function rows(items, render) {
   return items.length ? items.map(render).join("") : '<div class="note">None</div>';
+}
+
+// Ticker stays the anchor; identity sits beneath it in muted type.
+function sub(name, sector) {
+  const t = [name, sector].filter(Boolean).join(" · ");
+  return t ? `<div class="sub">${esc(t)}</div>` : "";
+}
+
+// `ticker` (raw, unescaped) is optional; when a row's own name/sector are
+// absent, fall back to the module-level FACTS map (already loaded from
+// /api/tickers before any panel renders). Covers rows sourced from artifacts
+// written before the `name` field existed (e.g. old data/signals-*.json).
+// `main` is plain text: cell() escapes it, so no call site has to remember to.
+function cell(main, name, sector, ticker) {
+  const f = (ticker && FACTS[ticker]) || {};
+  return `<div class="cell"><span>${esc(main)}</span>${sub(name || f.name, sector || f.sector)}</div>`;
+}
+
+// Mirrors vantage/tickers.py: same symbol shape, same price-cue rule. The
+// stoplist verdict arrives per-ticker as `common_word` so there is only one
+// list, maintained in Python. The 1-character rule is a rule, not a list, so
+// it lives here too — mirrors tickers._needs_price_cue.
+const TK_RE = /\b[A-Z][A-Z0-9]{0,4}(?:-[A-Z])?\b/g;
+const CUE_RE = /^\s*(?:is\s+|at\s+)?[+\-]?\$?\d/;
+const needsCue = (t, f) => t.length === 1 || !!f.common_word;
+
+// `facts` defaults to the module-level FACTS (overview, chat) but callers
+// scoped to a specific, non-latest brief (openBrief) pass their own map.
+function annotate(text, facts = FACTS) {
+  const s = String(text == null ? "" : text);
+  const frag = document.createDocumentFragment();
+  let last = 0, m;
+  TK_RE.lastIndex = 0;
+  while ((m = TK_RE.exec(s)) !== null) {
+    const f = facts[m[0]];
+    if (!f) continue;
+    const end = m.index + m[0].length;
+    if (needsCue(m[0], f) && !CUE_RE.test(s.slice(end, end + 12))) continue;
+    const tip = [f.name, f.sector].filter(Boolean).join(" · ");
+    if (!tip) continue;
+    frag.appendChild(document.createTextNode(s.slice(last, m.index)));
+    const span = document.createElement("span");
+    span.className = "tk";
+    span.textContent = m[0];          // text node, never innerHTML
+    span.setAttribute("data-tip", tip);
+    // CSS ::after content isn't reliably announced by screen readers, so
+    // the identity is repeated in an aria-label for assistive tech.
+    span.setAttribute("aria-label", m[0] + ", " + tip);
+    span.setAttribute("tabindex", "0");
+    frag.appendChild(span);
+    last = end;
+  }
+  frag.appendChild(document.createTextNode(s.slice(last)));
+  return frag;
+}
+
+// A <p> whose text is annotated. Used wherever prose is rendered.
+function proseP(className, text, facts = FACTS) {
+  const p = document.createElement("p");
+  p.className = className;
+  p.appendChild(annotate(text, facts));
+  return p;
 }
 
 async function loadOverview() {
@@ -15,13 +83,16 @@ async function loadOverview() {
   $("overview").innerHTML = `<h2>Overview</h2>
     <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
-    ${rows(o.top_leaders, (l) => `<div class="row"><span>${esc(l.ticker)}</span>
+    ${rows(o.top_leaders, (l) => `<div class="row">
+      ${cell(l.ticker, l.name, l.sector, l.ticker)}
       <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
     <div class="label">Sector momentum</div>
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
       <span class="${cls(m.value)}">${pct(m.value)}</span></div>`)}
     ${o.latest_brief ? `<div class="label">Latest brief — ${esc(o.latest_brief.as_of)}</div>
       <p class="prose lede">${esc(o.latest_brief.executive_summary)}</p>` : ""}`;
+  const lede = $("overview").querySelector(".prose.lede");
+  if (lede) lede.replaceChildren(annotate(lede.textContent));
 }
 
 async function loadPortfolio() {
@@ -35,7 +106,8 @@ async function loadPortfolio() {
     <div class="label">Top positions</div>
     ${rows(p.holdings.slice().sort((a, b) => (b.pct_of_portfolio || 0) -
         (a.pct_of_portfolio || 0)).slice(0, 8),
-      (h) => `<div class="row"><span>${esc(h.ticker)} — ${esc(h.name)}</span>
+      (h) => `<div class="row">
+        ${cell(h.ticker, h.name, h.sector, h.ticker)}
         <span>${pct(h.pct_of_portfolio)}</span></div>`)}`;
 }
 
@@ -43,7 +115,8 @@ async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
     ${rows(s.signals, (sig) => `<div class="row">
-      <span>${esc(sig.ticker)} · ${esc(sig.signal_type)}</span>
+      ${cell([sig.ticker, sig.signal_type].filter(Boolean).join(" · "),
+             sig.name, sig.sector, sig.ticker)}
       <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
         ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
 }
@@ -81,32 +154,69 @@ async function openBrief(asOf) {
   const data = await getJSON(`/api/briefs/${encodeURIComponent(asOf)}`);
   const b = data.brief;
   if (!b) return;
+  // Facts scoped to THIS brief, not just the latest one — otherwise an
+  // older brief's tickers fall out of the on-screen candidate set and its
+  // prose renders unannotated. Degrades to {} (plain text, no tooltips)
+  // rather than throwing if the lookup fails.
+  let briefFacts = {};
+  try {
+    briefFacts = await getJSON(`/api/tickers?as_of=${encodeURIComponent(asOf)}`);
+  } catch (e) { briefFacts = {}; }
+
   const panel = $("brief-detail");
   panel.style.display = "block";
-  // field name above its text (block label), not an inline "Thesis:"; k is static.
-  const field = (k, v) => `<p class="brief-field"><span class="field-k">${k}</span>${esc(v)}</p>`;
   panel.innerHTML = `<div class="brief-head"><h2>Brief — ${esc(b.as_of)}</h2>
-      <button id="brief-close">Close</button></div>
-    <div class="brief-body">
-      <div class="label">Executive summary</div>
-      <p class="prose lede">${esc(b.executive_summary)}</p>
-      ${(b.items || []).map((i) => `<div class="brief-item">
-        <h3 class="brief-item-title">${esc(i.title)}</h3>
-        ${field("Thesis", i.thesis)}
-        ${field("Evidence", i.evidence)}
-        ${field("Why it matters", i.why_it_matters)}
-        ${field("Portfolio relevance", i.portfolio_relevance)}
-        ${(i.sources && i.sources.length) ? `<p class="brief-sources">Sources: ${esc(i.sources.join(", "))}</p>` : ""}
-      </div>`).join("")}
-      <div class="label">Challenge &amp; coaching</div><p class="prose">${esc(b.challenge)}</p>
-      <div class="label">What I might be missing</div><p class="prose">${esc(b.what_im_missing)}</p>
-      <div class="label">Watchlist</div><p class="prose">${esc((b.watchlist || []).join(", ")) || "—"}</p>
-    </div>`;
+      <button id="brief-close">Close</button></div><div class="brief-body"></div>`;
+  const body = panel.querySelector(".brief-body");
+
+  const label = (t) => {
+    const d = document.createElement("div");
+    d.className = "label";
+    d.textContent = t;
+    return d;
+  };
+  const field = (k, v) => {
+    const p = document.createElement("p");
+    p.className = "brief-field";
+    const key = document.createElement("span");
+    key.className = "field-k";
+    key.textContent = k;
+    p.append(key, annotate(v, briefFacts));
+    return p;
+  };
+
+  body.append(label("Executive summary"), proseP("prose lede", b.executive_summary, briefFacts));
+  for (const i of b.items || []) {
+    const div = document.createElement("div");
+    div.className = "brief-item";
+    const h3 = document.createElement("h3");
+    h3.className = "brief-item-title";
+    h3.appendChild(annotate(i.title, briefFacts));
+    div.append(h3, field("Thesis", i.thesis), field("Evidence", i.evidence),
+               field("Why it matters", i.why_it_matters),
+               field("Portfolio relevance", i.portfolio_relevance));
+    if (i.sources && i.sources.length) {
+      const src = document.createElement("p");
+      src.className = "brief-sources";
+      src.textContent = "Sources: " + i.sources.join(", ");
+      div.appendChild(src);
+    }
+    body.appendChild(div);
+  }
+  body.append(label("Challenge & coaching"), proseP("prose", b.challenge, briefFacts),
+              label("What I might be missing"), proseP("prose", b.what_im_missing, briefFacts),
+              label("Watchlist"));
+  for (const w of b.watchlist || []) body.appendChild(proseP("prose wl", w, briefFacts));
+  if (!(b.watchlist || []).length) body.appendChild(proseP("prose", "—", briefFacts));
+
   $("brief-close").addEventListener("click", () => { panel.style.display = "none"; });
   panel.scrollIntoView({ behavior: "smooth" });
 }
 
-function loadData() { loadOverview(); loadPortfolio(); loadSignals(); loadBriefs(); }
+async function loadData() {
+  await loadFacts();
+  loadOverview(); loadPortfolio(); loadSignals(); loadBriefs();
+}
 
 // --- SSE helper: POST a JSON body, invoke onEvent per parsed event dict ---
 async function streamPost(url, body, onEvent) {
@@ -147,20 +257,27 @@ $("chat-form").addEventListener("submit", async (e) => {
   if (!msg) return;
   addMsg("user", msg);
   input.value = "";
+  // A reply interleaves text with tool calls, so it can own several bubbles.
+  // Keep every one: `bubble` is only the open (still-appending) one, while
+  // `bubbles` accumulates them all for annotation once the stream is done.
   let bubble = null;
+  const bubbles = [];
   try {
     await streamPost("/api/chat", { message: msg }, (ev) => {
       if (ev.type === "text") {
-        if (!bubble) bubble = addMsg("analyst", "");
+        if (!bubble) { bubble = addMsg("analyst", ""); bubbles.push(bubble); }
         bubble.textContent += ev.text;
         $("chat-log").scrollTop = $("chat-log").scrollHeight;
       } else if (ev.type === "tool_use") {
         addMsg("tool", `[looking up via ${ev.name}(${JSON.stringify(ev.input || {})})]`);
-        bubble = null;
+        bubble = null;   // next text starts a new bubble; this one is finished
       } else if (ev.type === "error") {
         addMsg("error", `[error: ${ev.message}]`);
       }
     });
+    // Annotate only after the stream ends — never mid-stream, or appending
+    // text would land inside/after the elements annotate() just built.
+    for (const b of bubbles) b.replaceChildren(annotate(b.textContent));
   } catch (e) {
     addMsg("error", "[error: " + e + "]");
   }

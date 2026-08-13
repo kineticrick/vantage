@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import asdict
 from pathlib import Path
 from fastapi import FastAPI, Request
@@ -9,6 +10,12 @@ from vantage.conversation import Conversation
 from vantage.web import artifacts as art
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Brief ids are dates ("2026-08-11"); this mirrors the shape openBrief()
+# already enforces client-side. An as_of that doesn't match is treated as
+# absent rather than erroring — the ticker map just falls back to being
+# unscoped by any brief (signals + portfolio only).
+_AS_OF_RE = re.compile(r"^[0-9-]+$")
 
 def _sse(events):
     for ev in events:
@@ -62,6 +69,22 @@ def create_app(settings=None, conversation_factory=None,
         if b is None:
             return JSONResponse({"error": "not found"}, status_code=404)
         return {"brief": b.to_dict(), "html": art.read_brief_html(s.reports_dir, as_of)}
+
+    @app.get("/api/tickers")
+    def tickers(as_of: str | None = None):
+        from vantage.tickers import load_facts
+        s = app.state.settings
+        pf = app.state.portfolio_loader(s.portfolio_analysis_path)
+        ss = art.latest_signals(s.data_dir)
+        if as_of is not None:
+            # Scope brief-text keys to the requested brief instead of the
+            # latest one. An unrecognized shape or an as_of with no matching
+            # brief file both degrade to "no brief" rather than erroring.
+            brief = art.load_brief(s.reports_dir, as_of) if _AS_OF_RE.match(as_of) else None
+        else:
+            briefs = art.list_briefs(s.reports_dir)
+            brief = art.load_brief(s.reports_dir, briefs[0]["as_of"]) if briefs else None
+        return art.relevant_ticker_facts(load_facts(s.cache_dir, pf), ss, pf, brief)
 
     def _get_conversation():
         if app.state.conversation is None:

@@ -75,3 +75,17 @@ def test_screener_sector_momentum_uses_median():
                     sectors={"A": "Tech", "B": "Tech", "C": "Tech"})
     ss = run_screener(md, return_leader_threshold=0.1, volume_spike_ratio=99.0)
     assert abs(ss.sector_momentum["Tech"] - 0.3) < 1e-6   # median, not mean (~0.83)
+
+def test_screener_carries_name_onto_signals():
+    from vantage.data_ingest import MarketData
+    from vantage.screener import run_screener
+    import pandas as pd
+    idx = pd.date_range("2024-01-01", periods=300, freq="D")
+    rising = pd.Series([100.0 + i for i in range(300)], index=idx)
+    md = MarketData(as_of="2026-08-12", prices={"MU": rising},
+                    volumes={"MU": pd.Series([1000.0] * 300, index=idx)},
+                    sectors={"MU": "Technology"},
+                    names={"MU": "Micron Technology"})
+    ss = run_screener(md)
+    assert ss.signals[0].name == "Micron Technology"
+    assert ss.signals[0].sector == "Technology"

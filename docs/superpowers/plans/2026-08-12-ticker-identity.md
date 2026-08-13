@@ -6,7 +6,7 @@
 
 **Architecture:** One new resolver unit (`vantage/tickers.py`) owns the ticker→facts map and the rules for spotting a ticker in prose. The yfinance `.info` call that `data_ingest` already makes for sector starts keeping the company name too, cached in the existing `cache/sectors.json`. Two consumers render it: the dashboard (structured rows get a `name · sector` subtitle; prose gets dotted-underline hover tooltips) and the report renderers (inline expansion on first mention per section, since mail clients can't be trusted with CSS tooltips).
 
-**Tech Stack:** Python 3.13, FastAPI, pandas, yfinance, pytest; vanilla JS/CSS (no frontend framework or build step).
+**Tech Stack:** Python 3.14, FastAPI, pandas, yfinance, pytest; vanilla JS/CSS (no frontend framework or build step).
 
 **Spec:** `docs/superpowers/specs/2026-08-12-ticker-identity-design.md`
 
@@ -20,7 +20,8 @@
 - `reports/brief-*.json` is never annotated — it stays the raw structured source of truth. Annotation happens at render time only and must not mutate the `Brief` object.
 - All file reads/writes of artifacts use `encoding="utf-8"` (existing convention).
 - The stoplist and price-cue rule live in `vantage/tickers.py` and are the single source of truth; the frontend receives the verdict via the `common_word` flag on `/api/tickers`.
-- Full suite baseline before starting: 51 tests passing (`.venv/bin/pytest -q`).
+- Full suite baseline before starting: **67 tests passing** (`.venv/bin/pytest -q`).
+- **Environment note (2026-08-12):** the system upgraded to Python 3.14.4 and removed 3.13, which broke the original venv. It was rebuilt with `virtualenv -p /usr/bin/python3.14 .venv` (plain `python3 -m venv` fails — `python3.14-venv` is not installed) and `pip install -r requirements.txt`. This pulled **pandas 3.0.5** (was 2.x). The full suite passes on it. If a task hits a pandas API that changed in 3.0, fix the call site rather than pinning pandas back.
 
 ---
 
@@ -159,6 +160,10 @@ def load_cache_facts(cache_dir) -> dict:
     try:
         raw = json.loads(p.read_text(encoding="utf-8"))
     except (ValueError, OSError):
+        return {}
+    if not isinstance(raw, dict):
+        # Valid JSON but not an object (e.g. "[]" or "null") is still corrupt
+        # from this cache's perspective.
         return {}
     return {t: TickerFacts(ticker=t, name=e.get("name"), sector=e.get("sector"))
             for t, e in raw.items() if isinstance(e, dict)}
@@ -614,7 +619,7 @@ Expected: PASS
 - [ ] **Step 5: Run the full suite**
 
 Run: `.venv/bin/pytest -q`
-Expected: PASS — 51 original + 4 new tests, no failures. If `tests/test_web_refresh.py` or `tests/test_run_weekly.py` fail on the `MarketData` constructor, add `names={}` to their fixtures.
+Expected: PASS — 67 original + 4 new tests, no failures. If `tests/test_web_refresh.py` or `tests/test_run_weekly.py` fail on the `MarketData` constructor, add `names={}` to their fixtures.
 
 - [ ] **Step 6: Commit**
 
@@ -1390,7 +1395,7 @@ git commit -m "feat(web): ticker tooltips in brief prose, watchlist, and chat"
 - [ ] **Step 1: Run the full test suite**
 
 Run: `.venv/bin/pytest -q`
-Expected: PASS — 51 original tests plus roughly 35 new ones, no failures.
+Expected: PASS — 67 original tests plus roughly 35 new ones, no failures.
 
 - [ ] **Step 2: Run the backfill**
 

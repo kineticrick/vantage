@@ -26,12 +26,13 @@ def _fake_download(tickers, period):
     return pd.DataFrame(data, index=idx, columns=cols)
 
 def _fake_sector(t):
-    return "Technology"
+    return {"sector": "Technology", "name": "Micron Technology"}
 
 def test_get_ticker_metrics_returns_real_numbers(tmp_path):
     out = get_ticker_metrics("MU", _settings(tmp_path),
-                             _downloader=_fake_download, _sector_fn=_fake_sector)
+                             _downloader=_fake_download, _info_fn=_fake_sector)
     assert out["ticker"] == "MU"
+    assert out["name"] == "Micron Technology"
     assert out["sector"] == "Technology"
     assert out["ret_12m"] is not None and out["ret_12m"] > 0
     assert out["volume_ratio"] > 1.0
@@ -41,7 +42,7 @@ def test_get_ticker_metrics_error_on_no_data(tmp_path):
     def empty_download(tickers, period):
         return pd.DataFrame()
     out = get_ticker_metrics("ZZZZ", _settings(tmp_path),
-                             _downloader=empty_download, _sector_fn=_fake_sector)
+                             _downloader=empty_download, _info_fn=_fake_sector)
     assert "error" in out and out["ticker"] == "ZZZZ"
 
 def test_run_screen_summarizes(tmp_path):

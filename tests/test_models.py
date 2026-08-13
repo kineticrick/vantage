@@ -41,3 +41,17 @@ def test_brief_roundtrip():
     b2 = Brief.from_dict(d)
     assert b2.items[0].sources == ["http://s"]
     assert b2.challenge == "c"
+
+def test_signal_loads_from_legacy_json_without_name(tmp_path):
+    import json
+    from vantage.models import SignalSet
+    p = tmp_path / "signals-2026-06-27.json"
+    p.write_text(json.dumps({
+        "as_of": "2026-06-27",
+        "signals": [{"ticker": "MU", "signal_type": "ret_12m_leader",
+                     "value": 1.4, "rank": 1, "sector": "Technology",
+                     "metrics": {}}],
+        "sector_momentum": {}}))
+    ss = SignalSet.load(p)
+    assert ss.signals[0].ticker == "MU"
+    assert ss.signals[0].name is None

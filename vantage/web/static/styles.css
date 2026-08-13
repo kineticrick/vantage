@@ -65,3 +65,30 @@ button:hover { filter: brightness(1.08); }
            font-size: 10.5px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
 .brief-sources { font-size: 12.5px; color: var(--muted); font-style: italic;
                  line-height: 1.6; overflow-wrap: anywhere; margin: 10px 0 0; }
+
+/* --- Ticker identity ------------------------------------------------- */
+/* Two-line row cell: symbol on top as the scannable anchor, company and
+   sector beneath. Keeps long names from crowding the value column. */
+.row .cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sub { font-size: 12.5px; color: var(--muted); line-height: 1.35;
+       overflow-wrap: anywhere; }
+
+/* Ticker in prose: dotted underline, identity on hover or keyboard focus.
+   CSS-only — no positioning library, no JS. Right-anchored (grows leftward
+   from the mark) and capped to a narrow, wrapping width so the tooltip
+   stays inside narrow scrolling columns (.chat-log, .data-col both compute
+   overflow-x: auto once overflow-y is set, so anything that pokes past the
+   scrollport gets clipped or forces a scrollbar) instead of being cut off
+   past the last ticker in a line. */
+.tk { border-bottom: 1px dotted var(--muted); cursor: help; position: relative;
+      outline: none; }
+.tk::after { content: attr(data-tip); position: absolute; right: 0; left: auto;
+  bottom: 130%; max-width: min(240px, calc(100vw - 48px)); white-space: normal;
+  text-align: left; line-height: 1.4; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px;
+  font-size: 12.5px; font-style: normal; box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  opacity: 0; pointer-events: none; transition: opacity .12s ease; z-index: 30; }
+.tk:hover::after, .tk:focus::after { opacity: 1; }
+.tk:focus { border-bottom-style: solid; }
+.tk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.prose.wl { margin-bottom: .5rem; }

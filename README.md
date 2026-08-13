@@ -59,6 +59,12 @@ screener output to `data/signals-<date>.json`. The first run of the day fetches
 prices for the whole universe and warms a long-lived sector cache, so it's
 slower; same-day re-runs are fast.
 
+The emailed (and `.md`/`.html`) brief expands each ticker's company name and
+sector inline on its first mention per section — e.g. `MU (Micron Technology,
+Inc. — Technology)` — since tooltips aren't reliable across mail clients. The
+`.json` artifact stays raw and unannotated; the dashboard applies its own
+tooltip treatment when rendering it.
+
 ### Conversational analyst
 
 ```bash
@@ -95,6 +101,11 @@ an analyst chat docked on the right.
 - **Data panels** read the latest artifacts from `data/` and `reports/` — no
   re-run needed. If no artifacts are present yet, panels show "None" /
   "Unavailable" without errors.
+- **Ticker identity** — tickers on the dashboard (Overview leaders, Signals,
+  Portfolio positions) show company name and sector beneath them when known,
+  degrading to whichever part is available (a lookup can fail or an entry can
+  lack a name). Tickers mentioned inside brief prose, the watchlist, and chat
+  replies carry a hover/focus tooltip with the same information instead.
 - **Refresh data** re-runs the full quantitative pipeline (market fetch →
   screener → portfolio context) and reloads all panels on completion. This
   makes real market-data requests and takes a few minutes.
@@ -115,6 +126,17 @@ python tools/build_universe.py   # refreshes config/universe.txt (needs lxml)
 Fetches current S&P 500 + Nasdaq-100 + S&P 400 constituents and writes them
 yfinance-normalized to `config/universe.txt`. (`lxml` is a tooling-only
 dependency, not needed by the pipeline itself.)
+
+### Backfill ticker names
+
+```bash
+python tools/backfill_ticker_names.py
+```
+
+One-time pass that fills the `name` field for every already-cached ticker in
+`cache/sectors.json` (sector-only entries from before ticker identity was
+added). The weekly pipeline self-heals this cache on its own as it runs, so
+this tool only exists to avoid waiting out the normal refresh cadence.
 
 ### Tests
 

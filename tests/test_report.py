@@ -56,3 +56,60 @@ def test_save_report_writes_all_three(tmp_path):
     assert md_path.name == "brief-2026-06-26.md"
     for ext in ("md", "html", "json"):
         assert (tmp_path / f"brief-2026-06-26.{ext}").exists()
+
+from vantage.tickers import TickerFacts
+
+_FACTS = {"MU": TickerFacts("MU", "Micron Technology", "Technology"),
+          "NVDA": TickerFacts("NVDA", "NVIDIA Corporation", "Technology"),
+          "WDC": TickerFacts("WDC", "Western Digital", "Technology")}
+
+def test_render_markdown_without_facts_is_unchanged():
+    assert render_markdown(_brief()) == render_markdown(_brief(), facts=None)
+
+def test_render_markdown_expands_first_mention():
+    md = render_markdown(_brief(), facts=_FACTS)
+    assert "MU (Micron Technology — Technology)" in md
+    assert "WDC (Western Digital — Technology)" in md      # challenge section
+    assert "NVDA (NVIDIA Corporation — Technology)" in md  # watchlist
+
+def test_render_html_expands_and_still_escapes():
+    from vantage.models import Brief, BriefItem
+    b = Brief(as_of="2026-06-26", executive_summary="MU <script>x</script> up",
+              items=[], watchlist=[], challenge="", what_im_missing="",
+              disclaimer="d")
+    html = render_html(b, facts=_FACTS)
+    assert "MU (Micron Technology — Technology)" in html
+    assert "<script>" not in html and "&lt;script&gt;" in html
+
+def test_expansion_resets_between_sections():
+    from vantage.models import Brief
+    b = Brief(as_of="2026-06-26", executive_summary="MU leads",
+              items=[], watchlist=[], challenge="MU again",
+              what_im_missing="", disclaimer="d")
+    md = render_markdown(b, facts=_FACTS)
+    assert md.count("MU (Micron Technology — Technology)") == 2
+
+def test_save_report_annotates_md_and_html_but_not_json(tmp_path):
+    import json
+    save_report(_brief(), tmp_path, facts=_FACTS)
+    md = (tmp_path / "brief-2026-06-26.md").read_text(encoding="utf-8")
+    html = (tmp_path / "brief-2026-06-26.html").read_text(encoding="utf-8")
+    raw = json.loads((tmp_path / "brief-2026-06-26.json").read_text(encoding="utf-8"))
+    assert "Micron Technology" in md and "Micron Technology" in html
+    assert "Micron Technology" not in json.dumps(raw)
+
+def test_rendering_does_not_mutate_the_brief():
+    b = _brief()
+    before = b.items[0].evidence
+    render_markdown(b, facts=_FACTS)
+    assert b.items[0].evidence == before
+
+def test_expansion_shared_across_fields_within_one_item():
+    # One `seen` set is shared across an item's four fields, so a ticker
+    # mentioned in both thesis and evidence expands only once within the item.
+    b = Brief(as_of="2026-06-26", executive_summary="",
+              items=[BriefItem(title="t", thesis="MU rallies", evidence="MU up 10%",
+                               sources=[], why_it_matters="", portfolio_relevance="")],
+              watchlist=[], challenge="", what_im_missing="", disclaimer="d")
+    md = render_markdown(b, facts=_FACTS)
+    assert md.count("MU (Micron Technology — Technology)") == 1
