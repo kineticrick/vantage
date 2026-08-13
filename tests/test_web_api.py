@@ -77,3 +77,37 @@ def test_tickers_endpoint(tmp_path):
 def test_tickers_endpoint_empty_when_no_artifacts(tmp_path):
     s = _settings(tmp_path)
     assert _client(s, available=False).get("/api/tickers").json() == {}
+
+def test_tickers_endpoint_as_of_scopes_to_named_brief(tmp_path):
+    s = _settings(tmp_path); _seed(s)
+    # An older brief mentions a ticker that's cached but absent from
+    # signals/portfolio and from the latest (2026-06-27) brief's text.
+    older = Brief("2026-06-20", "older summary", [], ["WDC"], "c", "m", "d")
+    (s.reports_dir / "brief-2026-06-20.json").write_text(json.dumps(older.to_dict()))
+    (s.cache_dir / "sectors.json").write_text(json.dumps(
+        {"WDC": {"sector": "Technology", "name": "Western Digital",
+                 "fetched": "2026-08-11"}}))
+    c = _client(s)
+    latest = c.get("/api/tickers").json()
+    assert "WDC" not in latest  # not on screen via the latest brief
+    scoped = c.get("/api/tickers", params={"as_of": "2026-06-20"}).json()
+    assert scoped["WDC"]["name"] == "Western Digital"
+
+def test_tickers_endpoint_invalid_as_of_degrades_safely(tmp_path):
+    s = _settings(tmp_path); _seed(s)
+    (s.cache_dir / "sectors.json").write_text(json.dumps(
+        {"NVDA": {"sector": "Technology", "name": "NVIDIA Corporation",
+                  "fetched": "2026-08-11"}}))
+    c = _client(s)
+    # Not date-shaped (fails the regex guard) — no error, brief scope dropped.
+    r = c.get("/api/tickers", params={"as_of": "../../etc/passwd"})
+    assert r.status_code == 200
+    body = r.json()
+    assert "MU" not in body            # brief-derived ticker not included
+    assert body["NVDA"]["name"] == "Nvidia"  # signals/portfolio scope intact
+    # Date-shaped but no matching brief file — same safe degradation.
+    r2 = c.get("/api/tickers", params={"as_of": "2099-01-01"})
+    assert r2.status_code == 200
+    body2 = r2.json()
+    assert "MU" not in body2
+    assert "NVDA" in body2

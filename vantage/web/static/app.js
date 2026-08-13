@@ -32,13 +32,15 @@ function cell(main, name, sector) {
 const TK_RE = /\b[A-Z][A-Z0-9]{0,4}(?:-[A-Z])?\b/g;
 const CUE_RE = /^\s*(?:is\s+|at\s+)?[+\-]?\$?\d/;
 
-function annotate(text) {
+// `facts` defaults to the module-level FACTS (overview, chat) but callers
+// scoped to a specific, non-latest brief (openBrief) pass their own map.
+function annotate(text, facts = FACTS) {
   const s = String(text == null ? "" : text);
   const frag = document.createDocumentFragment();
   let last = 0, m;
   TK_RE.lastIndex = 0;
   while ((m = TK_RE.exec(s)) !== null) {
-    const f = FACTS[m[0]];
+    const f = facts[m[0]];
     if (!f) continue;
     const end = m.index + m[0].length;
     if (f.common_word && !CUE_RE.test(s.slice(end, end + 12))) continue;
@@ -49,6 +51,9 @@ function annotate(text) {
     span.className = "tk";
     span.textContent = m[0];          // text node, never innerHTML
     span.setAttribute("data-tip", tip);
+    // CSS ::after content isn't reliably announced by screen readers, so
+    // the identity is repeated in an aria-label for assistive tech.
+    span.setAttribute("aria-label", m[0] + ", " + tip);
     span.setAttribute("tabindex", "0");
     frag.appendChild(span);
     last = end;
@@ -58,10 +63,10 @@ function annotate(text) {
 }
 
 // A <p> whose text is annotated. Used wherever prose is rendered.
-function proseP(className, text) {
+function proseP(className, text, facts = FACTS) {
   const p = document.createElement("p");
   p.className = className;
-  p.appendChild(annotate(text));
+  p.appendChild(annotate(text, facts));
   return p;
 }
 
@@ -140,6 +145,15 @@ async function openBrief(asOf) {
   const data = await getJSON(`/api/briefs/${encodeURIComponent(asOf)}`);
   const b = data.brief;
   if (!b) return;
+  // Facts scoped to THIS brief, not just the latest one — otherwise an
+  // older brief's tickers fall out of the on-screen candidate set and its
+  // prose renders unannotated. Degrades to {} (plain text, no tooltips)
+  // rather than throwing if the lookup fails.
+  let briefFacts = {};
+  try {
+    briefFacts = await getJSON(`/api/tickers?as_of=${encodeURIComponent(asOf)}`);
+  } catch (e) { briefFacts = {}; }
+
   const panel = $("brief-detail");
   panel.style.display = "block";
   panel.innerHTML = `<div class="brief-head"><h2>Brief — ${esc(b.as_of)}</h2>
@@ -158,17 +172,17 @@ async function openBrief(asOf) {
     const key = document.createElement("span");
     key.className = "field-k";
     key.textContent = k;
-    p.append(key, annotate(v));
+    p.append(key, annotate(v, briefFacts));
     return p;
   };
 
-  body.append(label("Executive summary"), proseP("prose lede", b.executive_summary));
+  body.append(label("Executive summary"), proseP("prose lede", b.executive_summary, briefFacts));
   for (const i of b.items || []) {
     const div = document.createElement("div");
     div.className = "brief-item";
     const h3 = document.createElement("h3");
     h3.className = "brief-item-title";
-    h3.appendChild(annotate(i.title));
+    h3.appendChild(annotate(i.title, briefFacts));
     div.append(h3, field("Thesis", i.thesis), field("Evidence", i.evidence),
                field("Why it matters", i.why_it_matters),
                field("Portfolio relevance", i.portfolio_relevance));
@@ -180,11 +194,11 @@ async function openBrief(asOf) {
     }
     body.appendChild(div);
   }
-  body.append(label("Challenge & coaching"), proseP("prose", b.challenge),
-              label("What I might be missing"), proseP("prose", b.what_im_missing),
+  body.append(label("Challenge & coaching"), proseP("prose", b.challenge, briefFacts),
+              label("What I might be missing"), proseP("prose", b.what_im_missing, briefFacts),
               label("Watchlist"));
-  for (const w of b.watchlist || []) body.appendChild(proseP("prose wl", w));
-  if (!(b.watchlist || []).length) body.appendChild(proseP("prose", "—"));
+  for (const w of b.watchlist || []) body.appendChild(proseP("prose wl", w, briefFacts));
+  if (!(b.watchlist || []).length) body.appendChild(proseP("prose", "—", briefFacts));
 
   $("brief-close").addEventListener("click", () => { panel.style.display = "none"; });
   panel.scrollIntoView({ behavior: "smooth" });
