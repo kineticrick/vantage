@@ -103,3 +103,13 @@ def test_rendering_does_not_mutate_the_brief():
     before = b.items[0].evidence
     render_markdown(b, facts=_FACTS)
     assert b.items[0].evidence == before
+
+def test_expansion_shared_across_fields_within_one_item():
+    # One `seen` set is shared across an item's four fields, so a ticker
+    # mentioned in both thesis and evidence expands only once within the item.
+    b = Brief(as_of="2026-06-26", executive_summary="",
+              items=[BriefItem(title="t", thesis="MU rallies", evidence="MU up 10%",
+                               sources=[], why_it_matters="", portfolio_relevance="")],
+              watchlist=[], challenge="", what_im_missing="", disclaimer="d")
+    md = render_markdown(b, facts=_FACTS)
+    assert md.count("MU (Micron Technology, Technology)") == 1
