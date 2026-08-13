@@ -61,7 +61,7 @@ slower; same-day re-runs are fast.
 
 The emailed (and `.md`/`.html`) brief expands each ticker's company name and
 sector inline on its first mention per section — e.g. `MU (Micron Technology,
-Technology)` — since tooltips aren't reliable across mail clients. The
+Inc. — Technology)` — since tooltips aren't reliable across mail clients. The
 `.json` artifact stays raw and unannotated; the dashboard applies its own
 tooltip treatment when rendering it.
 
