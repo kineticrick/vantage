@@ -65,3 +65,10 @@ button:hover { filter: brightness(1.08); }
            font-size: 10.5px; font-weight: 600; color: var(--muted); margin-bottom: 3px; }
 .brief-sources { font-size: 12.5px; color: var(--muted); font-style: italic;
                  line-height: 1.6; overflow-wrap: anywhere; margin: 10px 0 0; }
+
+/* --- Ticker identity ------------------------------------------------- */
+/* Two-line row cell: symbol on top as the scannable anchor, company and
+   sector beneath. Keeps long names from crowding the value column. */
+.row .cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sub { font-size: 12.5px; color: var(--muted); line-height: 1.35;
+       overflow-wrap: anywhere; }

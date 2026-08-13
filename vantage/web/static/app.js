@@ -10,12 +10,23 @@ function rows(items, render) {
   return items.length ? items.map(render).join("") : '<div class="note">None</div>';
 }
 
+// Ticker stays the anchor; identity sits beneath it in muted type.
+function sub(name, sector) {
+  const t = [name, sector].filter(Boolean).join(" · ");
+  return t ? `<div class="sub">${esc(t)}</div>` : "";
+}
+
+function cell(main, name, sector) {
+  return `<div class="cell"><span>${main}</span>${sub(name, sector)}</div>`;
+}
+
 async function loadOverview() {
   const o = await getJSON("/api/overview");
   $("overview").innerHTML = `<h2>Overview</h2>
     <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
-    ${rows(o.top_leaders, (l) => `<div class="row"><span>${esc(l.ticker)}</span>
+    ${rows(o.top_leaders, (l) => `<div class="row">
+      ${cell(esc(l.ticker), l.name, l.sector)}
       <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
     <div class="label">Sector momentum</div>
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
@@ -35,7 +46,8 @@ async function loadPortfolio() {
     <div class="label">Top positions</div>
     ${rows(p.holdings.slice().sort((a, b) => (b.pct_of_portfolio || 0) -
         (a.pct_of_portfolio || 0)).slice(0, 8),
-      (h) => `<div class="row"><span>${esc(h.ticker)} — ${esc(h.name)}</span>
+      (h) => `<div class="row">
+        ${cell(esc(h.ticker), h.name, h.sector)}
         <span>${pct(h.pct_of_portfolio)}</span></div>`)}`;
 }
 
@@ -43,7 +55,7 @@ async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
     ${rows(s.signals, (sig) => `<div class="row">
-      <span>${esc(sig.ticker)} · ${esc(sig.signal_type)}</span>
+      ${cell(esc(sig.ticker) + " · " + esc(sig.signal_type), sig.name, sig.sector)}
       <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
         ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
 }
