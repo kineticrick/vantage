@@ -89,7 +89,17 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
     cohorts = {
         "accelerating": [t for t, _ in scored[:n_cohort]],
         "leaders": [t for t, _ in leaders[:n_cohort]],
-        "fading": fading[:n_cohort],
+        # Unlike accelerating/leaders, "fading" is not ranked by anything --
+        # classify() doesn't score fading names, only accelerating ones (see
+        # vantage/momentum.py). `fading[:n_cohort]` used to take an arbitrary
+        # positional slice in column-iteration order (parquet column order,
+        # i.e. roughly alphabetical), which silently measured only the
+        # alphabetic head of the fading population rather than the fading
+        # population itself. Report the full population instead: it is the
+        # honest answer to "does the fade label predict?", at the cost of
+        # not being directly comparable in size to the ranked top-n_cohort
+        # accelerating/leaders cohorts.
+        "fading": fading,
         "universe": universe,
     }
 
