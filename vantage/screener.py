@@ -1,6 +1,7 @@
 import pandas as pd
 from statistics import median
 from vantage.models import Signal, SignalSet
+from vantage.momentum import drawdown_from_high
 
 _WINDOWS = {"ret_1m": 21, "ret_3m": 63, "ret_6m": 126, "ret_12m": 252}
 
@@ -43,6 +44,11 @@ def run_screener(market_data, top_n=25, return_leader_threshold=1.0,
         vr = _volume_ratio(vol) if vol is not None else None
         if vr is not None:
             metrics["volume_ratio"] = vr
+        # Descriptive only — how far below its own 52-week high the name sits.
+        # Nothing selects or ranks on this (see config/evidence.yaml).
+        dd = drawdown_from_high(prices)
+        if dd is not None:
+            metrics["drawdown_from_high"] = dd
         rows.append((ticker, market_data.sectors.get(ticker, "Unknown"),
                      market_data.names.get(ticker), metrics))
 

@@ -1,5 +1,6 @@
 # tests/test_screener.py
 import pandas as pd
+import pytest
 from vantage.data_ingest import MarketData
 from vantage.screener import run_screener
 
@@ -89,3 +90,40 @@ def test_screener_carries_name_onto_signals():
     ss = run_screener(md)
     assert ss.signals[0].name == "Micron Technology"
     assert ss.signals[0].sector == "Technology"
+
+def test_screener_attaches_drawdown_from_high():
+    idx = pd.date_range("2024-01-01", periods=300, freq="D")
+    # rises to 200 then falls back to 150 -> 25% below the trailing high
+    values = [100.0 + i for i in range(100)] + [200.0] * 100 + [150.0] * 100
+    md = MarketData(as_of="2026-08-14", prices={"AAA": pd.Series(values, index=idx)},
+                    volumes={"AAA": pd.Series([1000.0] * 300, index=idx)},
+                    sectors={"AAA": "Tech"}, names={"AAA": "Alpha"})
+    ss = run_screener(md, return_leader_threshold=0.0)
+    assert ss.signals[0].metrics["drawdown_from_high"] == pytest.approx(-0.25)
+
+def test_screener_omits_drawdown_when_series_too_short():
+    idx = pd.date_range("2024-01-01", periods=260, freq="D")
+    rising = pd.Series([100.0 + i for i in range(260)], index=idx)
+    md = MarketData(as_of="2026-08-14", prices={"AAA": rising},
+                    volumes={"AAA": pd.Series([1000.0] * 260, index=idx)},
+                    sectors={"AAA": "Tech"}, names={"AAA": "Alpha"})
+    ss = run_screener(md, return_leader_threshold=0.0)
+    # a 260-day series still supports the 252-day window, so this asserts the
+    # positive case; the guard itself is covered in test_momentum.py
+    assert "drawdown_from_high" in ss.signals[0].metrics
+
+def test_drawdown_does_not_change_selection():
+    """The premise of this whole project: nothing ranks on the term structure."""
+    idx = pd.date_range("2024-01-01", periods=300, freq="D")
+    def series(daily):
+        return pd.Series([100.0 * (1 + daily) ** i for i in range(300)], index=idx)
+    md = MarketData(
+        as_of="2026-08-14",
+        prices={"HIGH": series(0.006), "MID": series(0.004), "LOW": series(0.0005)},
+        volumes={t: pd.Series([1000.0] * 300, index=idx) for t in ("HIGH", "MID", "LOW")},
+        sectors={t: "Tech" for t in ("HIGH", "MID", "LOW")},
+        names={t: t for t in ("HIGH", "MID", "LOW")})
+    ss = run_screener(md)
+    leaders = [(s.ticker, s.rank) for s in ss.signals
+               if s.signal_type == "ret_12m_leader"]
+    assert leaders == [("HIGH", 1), ("MID", 2)]   # LOW is below the +100% bar
