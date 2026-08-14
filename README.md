@@ -194,6 +194,16 @@ python -m pytest -q
   (`#` comments allowed). Regenerate with `tools/build_universe.py`.
 - **`config/interests.yaml`** — your interest overlay (themes, sectors, risk
   appetite) that the analyst weighs alongside your actual holdings.
+- **`config/evidence.yaml`** — the evidence register: claims about this
+  market universe that have been tested empirically, each recorded with a
+  verdict (`supported`/`refuted`) and the data behind it. Both the weekly
+  brief and the conversational analyst load it (`vantage/evidence.py`) and
+  include it in their prompts, so the analyst treats prior findings as
+  settled rather than re-litigating them. A new entry is appended after each
+  study; see `docs/superpowers/findings/` for the studies themselves.
+  `tests/test_evidence_config.py` enforces the register's schema and asserts
+  that every cited finding path exists on disk. This changes only what the
+  analyst knows going in — it ships no change to what it shows you.
 
 ## Outputs
 

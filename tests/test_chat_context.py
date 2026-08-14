@@ -51,8 +51,58 @@ def test_load_chat_context_survives_corrupt_files(tmp_path):
     (s.config_dir / "interests.yaml").write_text("!!invalid: yaml: [")
     (s.data_dir / "signals-2026-06-27.json").write_text("{not valid json")
     (s.reports_dir / "brief-2026-06-27.json").write_text("{not valid json")
+    # load_evidence is called bare here — chat.py builds a Conversation
+    # unguarded, so a bad byte in this file must not reach the REPL.
+    (s.config_dir / "evidence.yaml").write_bytes(b"limits:\n  - a \x97 dash\n")
     ctx = load_chat_context(s, _portfolio_fn=lambda pa: _pc())
     assert ctx.interests == {}
     assert ctx.signals is None
     assert ctx.brief is None
+    assert ctx.evidence.claims == []
     assert ctx.render()  # must not raise
+
+def test_chat_context_renders_the_evidence_block():
+    from vantage.chat_context import ChatContext
+    from vantage.evidence import Evidence, Claim
+    ev = Evidence(universe="913 tickers", claims=[
+        Claim("id1", "A tested claim.", "refuted", "2026-08-13", "e",
+              "Do not act on it.", "docs/f.md")])
+    text = ChatContext(evidence=ev).render()
+    assert "Evidence register" in text
+    assert "Do not act on it." in text
+
+def test_evidence_block_is_blank_line_separated_from_its_neighbours():
+    # The block is ~32 lines among one-line parts; without the blank lines the
+    # brief line reads as a continuation of the last claim's Source: line.
+    from vantage.chat_context import ChatContext
+    from vantage.evidence import Evidence, Claim
+    ev = Evidence(claims=[Claim("id1", "A tested claim.", "refuted",
+                                "2026-08-13", "e", "i", "docs/f.md")])
+    text = ChatContext(evidence=ev).render()
+    assert "\n\n=== Evidence register" in text
+    assert "\n\nLatest brief" in text
+
+def test_chat_context_without_evidence_renders_without_the_block():
+    from vantage.chat_context import ChatContext
+    assert "Evidence register" not in ChatContext().render()
+
+def test_load_chat_context_loads_the_register(tmp_path, monkeypatch):
+    import yaml
+    from vantage.chat_context import load_chat_context
+    from vantage.models import PortfolioContext
+    for sub in ("config", "data", "reports"):
+        (tmp_path / sub).mkdir()
+    (tmp_path / "config" / "evidence.yaml").write_text(yaml.safe_dump({"claims": [{
+        "id": "x", "claim": "A tested claim.", "verdict": "refuted",
+        "tested": "2026-08-13", "evidence": "e", "implication": "i",
+        "finding": "f.md"}]}), encoding="utf-8")
+
+    class _S:
+        config_dir = tmp_path / "config"
+        data_dir = tmp_path / "data"
+        reports_dir = tmp_path / "reports"
+        portfolio_analysis_path = "/x"
+    ctx = load_chat_context(_S(),
+                            _portfolio_fn=lambda p: PortfolioContext(available=False, note="x"))
+    assert ctx.evidence is not None
+    assert "A tested claim." in ctx.render()
