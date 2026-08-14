@@ -135,3 +135,57 @@ def test_soft_floor_boundary_is_inclusive():
     # ret_1m exactly at min_1m_return (-0.15) still clears the soft floor.
     t = classify(_m(-0.15, 0.10, 0.08, 0.05), volatility=0.4)
     assert t.label == "accelerating"
+
+import numpy as np
+import pandas as pd
+from vantage.momentum import (realized_volatility, drawdown_from_high,
+                              single_day_share)
+
+def _series(values):
+    idx = pd.date_range("2025-01-01", periods=len(values), freq="B")
+    return pd.Series(values, index=idx, dtype="float64")
+
+def test_realized_volatility_of_constant_growth_is_zero():
+    prices = _series([100.0 * (1.01 ** i) for i in range(200)])
+    assert realized_volatility(prices) == pytest.approx(0.0, abs=1e-9)
+
+def test_realized_volatility_scales_with_dispersion():
+    rng = np.random.default_rng(0)
+    calm = _series(100.0 * np.exp(np.cumsum(rng.normal(0, 0.005, 200))))
+    wild = _series(100.0 * np.exp(np.cumsum(rng.normal(0, 0.020, 200))))
+    assert realized_volatility(wild) > realized_volatility(calm)
+
+def test_realized_volatility_annualizes():
+    # daily log-return stdev s -> annualized s * sqrt(252)
+    rng = np.random.default_rng(1)
+    daily = rng.normal(0, 0.01, 5000)
+    prices = _series(100.0 * np.exp(np.cumsum(daily)))
+    v = realized_volatility(prices, lookback=5000)
+    assert v == pytest.approx(np.std(daily, ddof=1) * np.sqrt(252), rel=0.05)
+
+def test_realized_volatility_short_series_is_none():
+    assert realized_volatility(_series([100.0, 101.0])) is None
+
+def test_drawdown_from_high_measures_distance_below_peak():
+    prices = _series([100.0] * 10 + [200.0] + [150.0])
+    assert drawdown_from_high(prices) == pytest.approx(-0.25)
+
+def test_drawdown_from_high_at_the_high_is_zero():
+    prices = _series([100.0, 120.0, 150.0])
+    assert drawdown_from_high(prices) == pytest.approx(0.0)
+
+def test_drawdown_from_high_empty_is_none():
+    assert drawdown_from_high(_series([])) is None
+
+def test_single_day_share_of_one_gap_move():
+    # one +10% session, flat either side: that day IS the whole move
+    prices = _series([100.0] * 5 + [110.0] * 5)
+    assert single_day_share(prices) == pytest.approx(1.0, rel=1e-6)
+
+def test_single_day_share_exceeds_one_when_a_day_beats_the_net_move():
+    # +20% in a day, then giving half back: the day outran the net result
+    prices = _series([100.0] * 3 + [120.0] + [110.0] * 3)
+    assert single_day_share(prices) > 1.0
+
+def test_single_day_share_flat_window_is_none():
+    assert single_day_share(_series([100.0] * 10)) is None

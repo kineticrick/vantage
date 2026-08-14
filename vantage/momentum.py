@@ -16,6 +16,8 @@ Two decisions shape everything here (see the design spec):
 Pure: no I/O, no settings, no network. Callers supply the numbers.
 """
 from dataclasses import dataclass
+import numpy as np
+import pandas as pd
 
 WINDOW_MONTHS = {"ret_1m": 1, "ret_3m": 3, "ret_6m": 6, "ret_12m": 12}
 
@@ -145,3 +147,56 @@ def _passes_gates(metrics, p) -> bool:
                 and r1 is not None and r1 >= p.min_1m_return)
     except TypeError:
         return False
+
+
+# --- price-series helpers ---------------------------------------------------
+# These need the series itself, not just the window returns, so they live
+# beside classify() rather than inside it — the caller passes their results in.
+
+TRADING_DAYS = 252
+
+
+def realized_volatility(prices, lookback=126):
+    """Annualized stdev of daily log returns. None if too short to measure."""
+    s = _tail(prices, lookback)
+    if s is None or len(s) < 20:
+        return None
+    logret = np.diff(np.log(s.to_numpy(dtype="float64")))
+    if len(logret) < 2:
+        return None
+    return float(np.std(logret, ddof=1) * np.sqrt(TRADING_DAYS))
+
+
+def drawdown_from_high(prices, lookback=TRADING_DAYS):
+    """How far below its own trailing high the last price sits. <= 0.0."""
+    s = _tail(prices, lookback)
+    if s is None or len(s) == 0:
+        return None
+    peak = float(s.max())
+    if peak <= 0:
+        return None
+    return float(s.iloc[-1]) / peak - 1.0
+
+
+def single_day_share(prices, lookback=63):
+    """Largest single session's move as a share of the window's net move.
+
+    Guards against one earnings gap manufacturing a quarter of 'acceleration'.
+    Can exceed 1.0 when a single day outran the net result.
+    """
+    s = _tail(prices, lookback)
+    if s is None or len(s) < 2:
+        return None
+    arr = s.to_numpy(dtype="float64")
+    net = arr[-1] / arr[0] - 1.0
+    if net == 0:
+        return None
+    biggest = float(np.max(np.abs(np.diff(arr) / arr[:-1])))
+    return biggest / abs(net)
+
+
+def _tail(prices, lookback):
+    if prices is None:
+        return None
+    s = pd.Series(prices).dropna()
+    return s.iloc[-lookback:] if lookback else s
