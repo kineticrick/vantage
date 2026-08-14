@@ -32,6 +32,15 @@ function cell(main, name, sector, ticker) {
   return `<div class="cell"><span>${esc(main)}</span>${sub(name || f.name, sector || f.sector)}</div>`;
 }
 
+// Third row line: the return term structure, description only. The server
+// sends the display strings; we never format a percentage here.
+function tsLine(ts) {
+  if (!ts || !ts.length) return "";
+  return `<div class="ts">${ts.map((e) =>
+    `<span class="ts-cell" title="${esc(e.label)}">${esc(e.display)}</span>`
+  ).join("")}</div>`;
+}
+
 // Mirrors vantage/tickers.py: same symbol shape, same price-cue rule. The
 // stoplist verdict arrives per-ticker as `common_word` so there is only one
 // list, maintained in Python. The 1-character rule is a rule, not a list, so
@@ -83,9 +92,10 @@ async function loadOverview() {
   $("overview").innerHTML = `<h2>Overview</h2>
     <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
-    ${rows(o.top_leaders, (l) => `<div class="row">
+    ${rows(o.top_leaders, (l) => `<div class="row srow">
       ${cell(l.ticker, l.name, l.sector, l.ticker)}
-      <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
+      <span class="${cls(l.value)}">${pct(l.value)}</span>
+      ${tsLine(l.term_structure)}</div>`)}
     <div class="label">Sector momentum</div>
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
       <span class="${cls(m.value)}">${pct(m.value)}</span></div>`)}
@@ -114,11 +124,12 @@ async function loadPortfolio() {
 async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
-    ${rows(s.signals, (sig) => `<div class="row">
+    ${rows(s.signals, (sig) => `<div class="row srow">
       ${cell([sig.ticker, sig.signal_type].filter(Boolean).join(" · "),
              sig.name, sig.sector, sig.ticker)}
       <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
-        ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
+        ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span>
+      ${tsLine(sig.term_structure)}</div>`)}`;
 }
 
 async function loadBriefs() {
