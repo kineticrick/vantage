@@ -89,16 +89,20 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
     cohorts = {
         "accelerating": [t for t, _ in scored[:n_cohort]],
         "leaders": [t for t, _ in leaders[:n_cohort]],
-        # Unlike accelerating/leaders, "fading" is not ranked by anything --
-        # classify() doesn't score fading names, only accelerating ones (see
-        # vantage/momentum.py). `fading[:n_cohort]` used to take an arbitrary
-        # positional slice in column-iteration order (parquet column order,
-        # i.e. roughly alphabetical), which silently measured only the
-        # alphabetic head of the fading population rather than the fading
-        # population itself. Report the full population instead: it is the
-        # honest answer to "does the fade label predict?", at the cost of
-        # not being directly comparable in size to the ranked top-n_cohort
-        # accelerating/leaders cohorts.
+        # `fading[:n_cohort]` used to take an arbitrary positional slice in
+        # column-iteration order (parquet column order, i.e. roughly
+        # alphabetical), which silently measured only the alphabetic head of
+        # the fading population rather than the fading population itself.
+        # classify() DOES assign every fading name a finite `score` (score is
+        # computed before the label branch in vantage.momentum.classify, not
+        # only for the accelerating path) -- so a ranked bottom-N by score
+        # (most decelerating first) was and is available and would have kept
+        # this cohort the same size N as accelerating/leaders, matching
+        # design spec §4.1's "cohorts of equal size N." We chose the full
+        # population instead: it is the more honest answer to "does the fade
+        # label predict?" (see the finding doc's explicit note on this
+        # deviation), at the cost of not being directly comparable in size to
+        # the ranked top-n_cohort accelerating/leaders cohorts.
         "fading": fading,
         "universe": universe,
     }

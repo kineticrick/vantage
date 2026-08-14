@@ -153,6 +153,32 @@ def test_run_backtest_reports_none_not_zero_when_nothing_accelerates():
         assert out["spread_vs_leaders"][h] is None
 
 
+def test_run_period_fading_cohort_is_not_capped_at_n_cohort():
+    # Unlike accelerating/leaders, "fading" is not ranked -- it is the full
+    # population labeled fading, not a top-n_cohort slice (see the comment
+    # in run_period()). Pin that: with n_cohort deliberately smaller than
+    # the number of names that actually decelerate, the fading cohort must
+    # still report all of them, not just n_cohort.
+    #
+    # Every ticker here decelerates monotonically (daily rate slides from
+    # +0.3%/day down to -0.1%/day), reproducing
+    # test_run_backtest_reports_none_not_zero_when_nothing_accelerates's
+    # fixture. Verified directly: at pos=483, four of the five (T1-T4) are
+    # labeled "fading".
+    n = 700
+    rates = np.linspace(0.003, -0.001, n)
+
+    def _decel(offset):
+        return 100.0 * np.cumprod(1.0 + rates + offset)
+
+    cols = {f"T{i}": _decel(i * 1e-5) for i in range(5)}
+    cols["SPY"] = 100.0 * np.cumprod(1.0 + rates)
+    prices = _frame(cols, n=n)
+    out = run_period(prices, 483, MomentumParams(), n_cohort=2)
+    assert out["fading"] == ["T1", "T2", "T3", "T4"]
+    assert len(out["fading"]) > 2   # exceeds n_cohort -- proves it isn't sliced
+
+
 def test_run_period_excludes_nan_scored_ticker_from_accelerating_cohort(monkeypatch):
     # Known hazard (carried forward from an earlier task's review): classify()
     # can hand back a Trajectory labeled "accelerating" whose .score is NaN

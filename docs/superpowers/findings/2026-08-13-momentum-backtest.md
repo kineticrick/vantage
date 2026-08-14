@@ -9,29 +9,44 @@ benchmark, SPY — plus SPY itself), 2,513 sessions, 2016-08-15 → 2026-08-13.
 **Run:** `.venv/bin/python tools/backtest_momentum.py`, all default settings
 (`n_cohort=15`, `benchmark="SPY"`, `horizons=(21, 63, 126)`, `step=21`).
 
-**Correction note:** this document was reviewed after a first draft and two
-critical analytical errors were found and fixed before publishing. Both are
-disclosed in place below (§3 and §4) rather than silently corrected,
-because how they were wrong is itself part of the finding. One harness bug
-(the fading cohort) was fixed in `tools/backtest_momentum.py` and the study
-re-run; every number in this document comes from that corrected run.
+**Correction note (third pass):** this document has been reviewed and
+corrected twice. Round one fixed a harness bug (the fading cohort was an
+unranked positional slice, not the full population it now is) and an
+analytical error (a false claim that a gate parameter "never bound"). Round
+two — this pass — fixes a false statement about why that fix was necessary,
+and a second analytical error that is the *same category of mistake* the
+document itself diagnoses in round one: comparing two separately-aggregated
+medians is not the same as pairing per-date differences, and doing so
+silently flipped the sign of two conclusions (§2 and §4 below). All three
+are disclosed in place rather than silently corrected, because the pattern
+of error is as much the finding as the numbers are. Every number in this
+document comes from the harness as currently committed; the paired
+per-date statistics were computed directly from `run_period`'s per-date
+output (not from `backtest-results.json`, which only stores the
+already-aggregated cohort medians/means and cannot reproduce a paired
+comparison).
 
 ## 1. Headline
 
 **No — the trajectory (acceleration) score does not beat the trailing
-12-month leader rank at any tested horizon.** In the baseline configuration,
-the pure 12-month-leader cohort outperformed the accelerating cohort by
--0.37 percentage points at 1 month, -3.81pp at 3 months, and -3.93pp at 6
-months (median forward return, accelerating minus leaders). The mean-based
-spread agrees in sign and is larger: -0.92pp, -3.30pp, -5.35pp. The gap
-widens, not narrows, with horizon, on both statistics. Every one of the six
-parameter variants tested produced the same sign at every horizon: the
-accelerating cohort never beat the 12-month leader cohort.
+12-month leader rank at any tested horizon, and this holds up under both an
+aggregate and a paired per-date check.** Aggregate medians: the pure
+12-month-leader cohort outperformed the accelerating cohort by -0.37
+percentage points at 1 month, -3.81pp at 3 months, and -3.93pp at 6 months.
+Paired per-date medians (accelerating minus leaders, computed per formation
+date, then aggregated — the statistically correct way to compare two
+cohorts measured on the same dates) show the same sign at every horizon:
+-1.21pp, -1.41pp, -5.31pp, with accelerating losing to leaders on a
+majority of individual formation dates (60/102, 56/102, 64/102). The two
+methods disagree on exact magnitude but agree on sign and on which side
+wins, at every horizon. Every one of the six parameter variants tested
+produced the same negative sign at every horizon on the aggregate measure.
 
-That said — see §6 — the 12-month leader rank used as the control here is
-itself an unusually strong performer relative to the plain universe, so
-"loses to this control" is a narrower and more accurate claim than "carries
-no information at all."
+Do not read this as "the acceleration score carries no information in any
+absolute sense" — see §2 below, where the same paired methodology shows its
+apparent edge over the *plain universe* (as opposed to the leader control)
+is not distinguishable from noise. The only claim this study supports is:
+**it loses to the 12-month-rank control Vantage already uses.**
 
 ## 2. The table
 
@@ -39,7 +54,12 @@ Baseline parameters (`MomentumParams()` defaults), 102 formation dates,
 step = 21 trading days. All four cohorts had 102/102 formation dates
 contribute a value (no cohort was ever empty across the run).
 
-### 2.1 Cohort forward returns
+### Cohort forward returns (unpaired, for context)
+
+These are each cohort's own aggregate median/mean across all 102 dates,
+useful for orientation but **not** valid for computing one cohort minus
+another — see the next subsection for why, and for the numbers that are
+valid for that purpose.
 
 | Horizon | Accelerating | Leaders (12m rank) | Fading | Universe |
 |---|---|---|---|---|
@@ -50,7 +70,7 @@ contribute a value (no cohort was ever empty across the run).
 | 126d (~6mo) median | +8.19% | +12.12% | +5.96% | +6.68% |
 | 126d mean | +10.27% | +15.62% | +5.87% | +6.15% |
 
-Raw run output (baseline block, post-fix):
+Raw run output (baseline block):
 
 ```
 prices-2026-08-13.parquet: 913 tickers, 2513 sessions
@@ -61,39 +81,84 @@ prices-2026-08-13.parquet: 913 tickers, 2513 sessions
   126d fwd  accel +8.19%  leaders +12.12%  universe +6.68%  fading +5.96%  spread -3.93%
 ```
 
-### 2.2 Every cohort against the plain universe
+### Paired per-date comparisons: hit rate and dispersion
 
-The design spec (§4.2) calls for this comparison and an earlier draft of
-this document printed the universe column without ever using it. Reporting
-it changes the picture materially: the accelerating cohort is not "no
-better than random" — it modestly beats the plain universe at longer
-horizons, it simply loses by more to the 12-month-rank control.
+**This subsection replaces an earlier draft that computed "accelerating
+minus universe" and "fading minus universe" as differences of the
+separately-aggregated medians above (e.g. 8.19% − 6.68% = +1.51pp). That is
+not a valid way to compare two cohorts observed on the same 102 dates — a
+difference of medians is not the median of differences, and the earlier
+draft's conclusions do not survive correcting it. This is the same failure
+mode diagnosed in §3 below (a median-based aggregate can misrepresent what
+happens date by date), showing up a second time in the same document.**
 
-| Comparison | 21d | 63d | 126d |
-|---|---|---|---|
-| Accelerating − universe (median) | -0.08pp | -0.42pp | **+1.51pp** |
-| Accelerating − universe (mean) | **+0.30pp** | **+1.73pp** | **+4.13pp** |
-| Leaders − universe (median) | +0.29pp | +3.39pp | +5.44pp |
-| Leaders − universe (mean) | +1.22pp | +5.04pp | +9.47pp |
-| Fading − universe (median) | -0.13pp | -0.51pp | -0.72pp |
-| Fading − universe (mean) | +0.11pp | +0.05pp | -0.27pp |
+The correct comparison pairs each cohort's forward return *on the same
+formation date* and aggregates the resulting 102 differences directly.
+Design spec §4.2 requires hit rate and dispersion alongside mean/median for
+exactly this reason; neither was reported in earlier drafts, which is what
+let the error through.
 
-Two things follow from this table. First, on the mean statistic the
-accelerating cohort beats the plain universe at every horizon, and on the
-median it does too by 6 months — so the honest description of the score is
-"loses decisively to an unusually strong control, while still modestly
-beating a naive baseline," not "carries no predictive information." Second,
-the 12-month-leader control is not a neutral yardstick: it beats the
-universe by +5.44pp median / +9.47pp mean at 6 months, which is a large
-edge for a "control." Losing to that control is a real, negative finding
-about the acceleration score relative to what Vantage does today — it is
-just not evidence that trailing pace/acceleration information is worthless
-in general.
+**Accelerating − universe**, paired per date:
+
+| Horizon | Median diff | Mean diff | Std dev (dispersion) | Hit rate (accel > universe) |
+|---|---|---|---|---|
+| 21d | +0.48pp | +0.30pp | 4.8pp | 54 / 102 |
+| 63d | +0.03pp | +1.73pp | 10.8pp | 52 / 102 |
+| 126d | +1.34pp | +4.13pp | 16.7pp | 58 / 102 |
+
+**Fading − universe**, paired per date:
+
+| Horizon | Median diff | Mean diff | Std dev (dispersion) | Hit rate (fading < universe) |
+|---|---|---|---|---|
+| 21d | -0.04pp | +0.11pp | 1.3pp | 54 / 102 |
+| 63d | **+0.09pp** | +0.05pp | 2.4pp | 47 / 102 |
+| 126d | -0.02pp | -0.27pp | 3.2pp | 52 / 102 |
+
+**Accelerating − leaders**, paired per date, for comparison against the
+headline (§1):
+
+| Horizon | Median diff | Mean diff | Std dev (dispersion) | Hit rate (accel < leaders) |
+|---|---|---|---|---|
+| 21d | -1.21pp | -0.92pp | 7.5pp | 60 / 102 |
+| 63d | -1.41pp | -3.30pp | 14.5pp | 56 / 102 |
+| 126d | -5.31pp | -5.35pp | 23.7pp | 64 / 102 |
+
+Reading these together: **accelerating-vs-universe and fading-vs-universe
+are both statistically indistinguishable from noise.** Hit rates sit in the
+50–58% range against a 50% coin-flip baseline, medians and means disagree
+in sign and magnitude within the same row (e.g. accelerating-vs-universe at
+63d: median +0.03pp but mean +1.73pp; fading-vs-universe at 63d: median is
+*positive* — fading beat the universe on the median date — while the
+earlier draft's aggregate-median approach reported -0.51pp), and dispersion
+is large relative to the point estimates (e.g. accelerating-vs-universe at
+126d: median +1.34pp against a 16.7pp standard deviation across only 102,
+non-independent, overlapping dates). None of this supports "the score
+modestly beats the universe" or "the fade flag has a small, real,
+growing signal" — both claims in earlier drafts, both now withdrawn.
+
+**Accelerating-vs-leaders (the actual headline) is different: it is
+directionally consistent.** All three horizons show a negative median,
+negative mean, and a hit rate that climbs with horizon (58.8% → 54.9% →
+62.7%) — smaller effects than the ~50% coin-flip range seen in the
+universe comparisons above, and still not dispositive on 102
+non-independent dates, but a materially different picture from the
+universe comparisons: same sign on both statistics at every horizon, and
+hit rate consistently above half rather than oscillating around it. That
+consistency, not the size of any single point estimate, is why §1 treats
+this result as robust and the universe comparisons as noise.
+
+*Why mean survived unpaired but median didn't:* mean is a linear
+statistic, so `mean(A) − mean(B) == mean(A − B)` always holds — a
+difference-of-means is automatically a mean-of-differences, paired or not.
+Median has no such identity. That is precisely why the mean-based spread
+figures reported throughout this document (e.g. -0.92 / -3.30 / -5.35pp in
+§1) needed no correction, while every median-based cross-cohort comparison
+did.
 
 ## 3. Parameter sweep
 
-All six variants, spread vs. leaders (accelerating − leaders, median) at
-each horizon, from the actual run:
+All six variants, spread vs. leaders (accelerating − leaders, aggregate
+median) at each horizon, from the actual run:
 
 | Variant | 21d spread | 63d spread | 126d spread |
 |---|---|---|---|
@@ -112,13 +177,13 @@ and same three horizons, and that width is itself a multiple-comparisons
 exposure worth naming even though, in this case, it produced no false
 positive to guard against.
 
-### 3.1 §2.2 prediction, answered directly — corrected
+### The one-month gate prediction (design spec §2.2), answered directly — corrected
 
-**An earlier draft of this section claimed the -15% one-month floor "never
-bound" because baseline and "no 1m gate" produced identical aggregate
-spreads. That claim is false, and the review that caught it also caught the
-coordinator repeating it — it is worth explaining exactly how, because the
-mechanism is more informative than either the claim or its correction.**
+**An earlier draft claimed the -15% one-month floor "never bound" because
+baseline and "no 1m gate" produced identical aggregate median spreads. That
+claim is false, and the review that caught it also caught the coordinator
+repeating it — it is worth explaining exactly how, because the mechanism is
+more informative than either the claim or its correction.**
 
 Measured directly by re-classifying every ticker at every formation date
 under both `min_1m_return=-0.15` (baseline) and `min_1m_return=-1.0` (no
@@ -148,77 +213,102 @@ gate) and diffing the results:
 So the floor *does* bind, and it binds specifically on the highest-volatility,
 highest-drama names in the sample — AMD, GME, MSTR, COIN — which is exactly
 the population a momentum-acceleration study most needs to get right. The
-aggregate spread was identical anyway because **the headline statistic is a
-median of 102 per-date medians, and a median is insensitive to changes on
-~5% of periods unless those changes happen to move the 51st/52nd order
-statistic.** Swapping one name in and one out of a 15-member cohort, on 7
-dates out of 102, essentially never does that. The identical top-line
-number is a property of the *estimator*, not evidence the *parameter* is
-inert — and it means this backtest's headline number would not have
-detected the floor mattering even though it demonstrably does at the
-individual-cohort level.
+**aggregate median** spread was identical anyway because it is a median of
+102 per-date medians, and a median is insensitive to changes on ~5% of
+periods unless those changes happen to move the 51st/52nd order statistic;
+swapping one name in and one out of a 15-member cohort, on 7 dates out of
+102, essentially never does that.
 
-With that corrected, the actual §2.2 result stands as previously reported:
-the design predicted a strict positive-1m gate should *hurt* forward
-performance (short-horizon reversal). It didn't — the strict gate
-(`min_1m_return=0.0`) modestly *helped*: 63d accelerating median rose from
-+3.92% (baseline) to +4.02%, spread improved from -3.81pp to -3.71pp; 126d
-rose from +8.19% to +8.66%, spread improved from -3.93pp to -3.46pp; 21d
-unchanged. **The prediction was wrong — in the opposite direction from what
-was originally (also incorrectly) framed as "no effect to speak of."** The
-sweep's six configurations are genuinely distinct conditions, not a
-baseline-vs-strict-gate binary; there is no single "the informative
-comparison," and treating one as such was itself part of the error.
+**One more corroboration, free of any re-classification work:** the
+**mean** is not blind the way the median is — being linear (see the
+identity noted in §2), it reacts to small compositional changes the median
+can hide. And indeed, baseline and "no 1m gate" differ on the mean even
+though their medians match exactly: accelerating mean is 1.53% vs. 1.52%
+at 21d, 5.04% vs. 5.06% at 63d, 10.27% vs. 10.42% at 126d (all four values
+read directly from `backtest-results.json`, no re-run needed). Small
+differences, but they are there, and the median genuinely is not — this is
+the same median-vs-mean sensitivity gap as the paired-comparison finding in
+§2, appearing here as a second, independent line of evidence for the same
+underlying fact: **the aggregate median statistic this study leans on is
+frequently blind to real changes that the mean, or a proper per-date pairing,
+can see.**
 
-## 4. Does the fade flag work? — corrected
+With that corrected, the actual empirical result on the gate stands as
+previously reported: the design predicted a strict positive-1m gate should
+*hurt* forward performance (short-horizon reversal). It didn't — the strict
+gate (`min_1m_return=0.0`) modestly *helped* on the aggregate median: 63d
+accelerating median rose from +3.92% (baseline) to +4.02%, spread improved
+from -3.81pp to -3.71pp; 126d rose from +8.19% to +8.66%, spread improved
+from -3.93pp to -3.46pp; 21d unchanged. **The prediction was wrong — in the
+opposite direction from what was originally (also incorrectly) framed as
+"no effect to speak of."** The sweep's six configurations are genuinely
+distinct conditions, not a baseline-vs-strict-gate binary; there is no
+single "the informative comparison," and treating one as such was itself
+part of the original error.
 
-**This section was rewritten after a second critical error was found:
-`tools/backtest_momentum.py` built the fading cohort as `fading[:n_cohort]`
-— a positional slice of Python dict/column iteration order (i.e., roughly
-the parquet's column order), not a ranking. Unlike `accelerating` and
-`leaders`, which are genuinely ranked top-15s, the old "fading" cohort was
-whichever 15 fading-labeled names happened to sit earliest in column order,
-which in practice meant the alphabetic head of the fading population on
-every date. Every fade number in the original draft described that
-alphabetic head, not the fade label's actual performance.**
+## 4. Does the fade flag work? — corrected, twice
 
-**Fix applied:** `classify()` does not score fading names the way it scores
-accelerating ones (`vantage/momentum.py` only computes `score` for the
-`accelerating` path), so there is no principled "top-N by score" ranking
-available for fading the way there is for accelerating. The harness now
-reports the **full fading population** at each formation date — the
-honest, complete answer to "does the fade label predict?" — rather than an
-arbitrary positional subset. This is disclosed here as the choice made;
-`tools/backtest_momentum.py`'s inline comment explains it at the source.
+**Round one** of review found that `tools/backtest_momentum.py` built the
+fading cohort as `fading[:n_cohort]` — a positional slice of Python
+dict/column iteration order (i.e., roughly the parquet's column order), not
+a ranking. Unlike `accelerating` and `leaders`, which are genuinely ranked
+top-15s, the old "fading" cohort was whichever 15 fading-labeled names
+happened to sit earliest in column order, which in practice meant the
+alphabetic head of the fading population on every date.
 
-The fading population is large and variable: **median 290 names per date
+**A false justification for the fix must itself be corrected here.** An
+earlier draft, and the harness's own source comment, stated that
+`classify()` "only computes `score` for the accelerating path" and that
+therefore no principled ranking was available for fading, forcing the
+choice of the full population. **That is false.** In `vantage/momentum.py`,
+`score` is assigned *before* the label branch — every ticker gets a score
+if volatility/gap are usable, regardless of what label it ends up with.
+Verified directly: at the 2021-10-15 formation date, all 346 of 346 names
+labeled "fading" carried a finite score (most negative: PR -9.81, TPL
+-4.53, MRNA -4.23). **A principled ranked cohort — bottom-N by score, i.e.
+the N most decelerating names — was available**, and would have preserved
+design spec §4.1's requirement that all cohorts be "of equal size N."
+
+**We nonetheless kept the full-population choice**, and are stating the
+deviation from spec §4.1 explicitly rather than leaving it implicit: this
+study's `fading` cohort is *not* size-N like `accelerating` and `leaders`,
+it is every name labeled fading on that date. The full population is
+arguably the more honest measurement of "does the fade label predict?" —
+a bottom-N-by-score cohort would only test whether the *most extreme*
+decelerators underperform, a narrower and different question — but it is a
+deviation from the literal "equal size N" instruction, and the spec's own
+bullet for cohort D ("names labeled fading") does not itself specify a size
+cap the way the bullets for cohorts A and B do, which is the reading this
+implementation followed. `tools/backtest_momentum.py`'s inline comment now
+states this accurately rather than citing a nonexistent scoring limitation.
+
+The fading population is large and variable: **median 290.5 names per date
 (mean 300.4, range 181–521)**, versus the 15-member ranked accelerating and
 leaders cohorts. It is not directly size-comparable to those two.
 
-Fading vs. universe, full population, baseline parameters, recomputed from
-the corrected run:
+**Round two of review** caught that, independent of the ranking question,
+the fading-vs-universe numbers computed after round one's fix were
+themselves invalid — computed as a difference of separately-aggregated
+medians rather than a paired per-date comparison (the same error described
+in §2). The corrected, paired numbers are reproduced from §2 above:
 
-| Horizon | Fading (median) | Universe (median) | Fading − universe (median) | Fading − universe (mean) |
+| Horizon | Median diff (paired) | Mean diff (paired) | Std dev | Hit rate (fading underperforms) |
 |---|---|---|---|---|
-| 21d | +2.01% | +2.14% | **-0.13pp** | +0.11pp |
-| 63d | +3.83% | +4.34% | **-0.51pp** | +0.05pp |
-| 126d | +5.96% | +6.68% | **-0.72pp** | -0.27pp |
+| 21d | -0.04pp | +0.11pp | 1.3pp | 54 / 102 |
+| 63d | **+0.09pp** | +0.05pp | 2.4pp | 47 / 102 |
+| 126d | -0.02pp | -0.27pp | 3.2pp | 52 / 102 |
 
-**On the median, the fade flag shows a small but real and monotonically
-growing signal** — underperformance is weakest at 1 month and grows through
-6 months, the opposite of what the original (bugged) draft reported
-("some short-horizon signal, not durable"). This is a genuine reversal of
-the earlier conclusion, not a restatement of it.
-
-On the mean, the picture is noisier and does not confirm the same monotonic
-growth (+0.11pp, +0.05pp, then -0.27pp) — plausibly because a
-median-290-name population with a long right tail (it is unranked and
-unfiltered) makes the mean sensitive to a handful of large outlier
-recoveries that the median ignores. Both statistics agree on the sign at 6
-months (fading underperforms universe), but only the median shows the
-clean monotonic pattern. Read the fade flag's signal as **real but small**
-— at most three quarters of a percentage point of median underperformance
-by 6 months — and not something that should carry much weight on its own.
+**The fade flag shows no reliable signal.** This reverses both the
+round-one bugged conclusion ("some short-horizon signal, not durable") and
+the round-one-fixed-but-still-wrong conclusion ("small but real and
+monotonically growing" — median deltas of -0.13/-0.51/-0.72pp, computed the
+invalid unpaired way). The paired numbers are non-monotonic, flip sign
+between horizons and between median/mean within the same horizon (63d
+median is *positive* — fading modestly outperformed the universe on the
+typical date — while 126d mean is negative), and sit on hit rates of
+47–54 out of 102, which is within noise of a coin flip. There is nothing
+here to report as a finding beyond "not distinguishable from noise, at
+this sample size, with this methodology."
 
 ## 5. Caveats — stated plainly
 
@@ -239,7 +329,7 @@ against the correct denominator of **912 non-benchmark tickers** (the
 harness excludes only the return benchmark, SPY — QQQ remains in the
 universe/leaders/accelerating/fading pools):
 
-- Usable-ticker count per date: **minimum 805, median 862, maximum 903.**
+- Usable-ticker count per date: **minimum 805, median 861.5, maximum 903.**
 - The count stabilizes to within 95% of its maximum (n=858) by the
   formation date **2021-07-19**; it climbs gradually and gently from the
   earliest formation date (2017-08-15, n=805) through roughly mid-2021,
@@ -272,6 +362,31 @@ nothing in the reported numbers is contaminated by them — but that is luck
 of the grid alignment, not a property that was verified in advance, and is
 worth a line for anyone reusing this snapshot with a different step size.
 
+**Methodological lesson, stated for anyone re-running this study: this
+document's headline statistic needed a paired companion, twice.** §3 shows
+a median-of-102-medians can be completely blind to a change (the one-month
+gate) that demonstrably alters the ranked cohort on 7 of 102 dates,
+because the change never happens to move the 51st/52nd order statistic.
+§2 and §4 show that comparing two cohorts' separately-aggregated medians
+(rather than pairing per formation date and aggregating the differences)
+can flip the sign of the conclusion outright. Both failures share a root
+cause: **median is not linear, so operations that are safe on means
+(subtraction, in particular) are not safe on medians.** Anyone extending
+this backtest should report hit rate and dispersion (design spec §4.2
+already requires this) and should always compare cohorts via paired
+per-date differences, never via the difference of two independently
+computed aggregate statistics — the mean is forgiving of this shortcut,
+the median is not.
+
+**The `fading` cohort deviates from design spec §4.1's "cohorts of equal
+size N."** `classify()` assigns every fading-labeled name a finite score
+(not only accelerating names — see §4's correction above), so a ranked
+bottom-N-by-score cohort was available and would have matched spec. This
+study reports the full fading population instead, a deliberate choice
+disclosed at the point of use (§4) and in `tools/backtest_momentum.py`'s
+source comment, not an oversight — but it is a real deviation from the
+letter of the spec, and is recorded here as one.
+
 **The `leaders` cohort here is not identical to what Vantage ships today.**
 This backtest's `leaders` cohort is a pure top-15-by-trailing-12-month-return
 rank with no floor — the correct control for isolating "does the
@@ -284,14 +399,18 @@ drops the entire ticker if any single window in it is unusable. Do not read
 the `leaders` numbers in this document as "what the dashboard shows today";
 they are the idealized 12-month-rank control the design called for.
 
-**`backtest-results.json` does not round-trip its horizon keys.** The
-`cohorts` and `spread_vs_leaders` dicts are keyed by the integer horizons
-(21, 63, 126); `json.dumps` stringifies them, so a plain `json.loads` of the
-artifact yields string keys ("21", "63", "126"), not ints. Anyone consuming
-that file directly needs to know this; it is why every number in this
-document is transcribed from the run output or read directly out of the
-JSON's numeric fields, rather than merely pointed at the file (the JSON is
-also git-ignored — see below).
+**`backtest-results.json` does not round-trip its horizon keys, and cannot
+reproduce the paired per-date statistics in §2/§4.** The `cohorts` and
+`spread_vs_leaders` dicts are keyed by the integer horizons (21, 63, 126);
+`json.dumps` stringifies them, so a plain `json.loads` of the artifact
+yields string keys ("21", "63", "126"), not ints. More importantly, the
+JSON only stores each cohort's already-aggregated median/mean per horizon —
+it does not retain per-formation-date values, so the paired comparisons in
+this document (§2, §4, and the headline robustness check in §1) had to be
+computed by re-running `run_period` directly over the snapshot, not by
+reading the JSON. Anyone wanting to reproduce or extend the paired analysis
+needs to do the same, or the harness needs to be extended to persist
+per-date cohort medians.
 
 **The parameter sweep never varies cohort size.** Design spec §4.3 lists N
 (cohort size) among the parameters the study should settle empirically
@@ -299,14 +418,18 @@ alongside `min_recent_return`, `min_1m_return`, recent window, and
 volatility normalization. `SWEEP` in `tools/backtest_momentum.py` does not
 include an N variant — every run uses the default `n_cohort=15`. This is an
 omission relative to the spec, not a finding; whether a smaller or larger
-cohort changes the spread (or the fade-flag sensitivity issue in §3.1) is
-untested.
+cohort changes the spread (or the gate-sensitivity issue in §3, or the
+fading-cohort deviation above) is untested.
 
 **Other caveats, standard for this kind of study:**
 - Overlapping forward windows (21-day formation step against up to 126-day
   forward horizons) mean consecutive formation dates share most of their
   return history — they are not independent observations, and the
-  "102 formation dates" figure overstates effective sample size.
+  "102 formation dates" figure overstates effective sample size. This also
+  means the hit-rate and dispersion figures in §2/§4, while a large
+  improvement on an unpaired aggregate, are still not a clean statistical
+  test — 102 correlated dates carry less information than 102 independent
+  ones.
 - No transaction costs, slippage, or position sizing; cohort returns are
   equal-weighted medians (and, where reported, means) of a hypothetical
   instantaneous entry.
@@ -316,46 +439,51 @@ untested.
 
 `cache/` is git-ignored, so neither the parquet snapshot nor
 `backtest-results.json` is committed alongside this document — every number
-above was transcribed by hand from the actual (post-fix) run's console
-output and the JSON artifact's numeric fields, not regenerated or
-estimated.
+above was transcribed by hand from the actual run's console output, the
+JSON artifact's numeric fields, or a direct re-run of `run_period` for the
+paired statistics, not regenerated or estimated.
 
 ## 6. Recommendation for Phase 2
 
-**The score does not beat 12-month momentum in this backtest, against a
-control that is itself unusually strong.** Across all six parameter
-variants and all three horizons, the accelerating cohort underperformed the
-pure 12-month-leader cohort — most severely at 3 and 6 months, where the
-median gap runs roughly -3.5pp to -4.6pp in five of six variants (the
-sixth, the 6-month recent window, narrows the gap to -1.0pp to -1.2pp but
-never crosses to positive; mean spreads are negative at every horizon in
-baseline too, corroborating the median). This is a negative result relative
-to the 12-month-rank control, and it should be reported as one rather than
-framed around whichever variant happened to come closest.
+**The score does not beat 12-month momentum in this backtest, and that
+result is robust.** It holds on the aggregate median (-0.37 / -3.81 /
+-3.93pp), the aggregate mean (-0.92 / -3.30 / -5.35pp), and the paired
+per-date median (-1.21 / -1.41 / -5.31pp, with accelerating losing on the
+majority of individual dates at every horizon: 60/102, 56/102, 64/102).
+Three different ways of measuring "does accelerating beat leaders" agree in
+sign at every horizon. All six parameter variants agree too — zero of 18
+variant-horizon combinations showed a positive spread.
 
-At the same time, §2.2 shows the accelerating cohort is not informationless
-in an absolute sense — it modestly beats the plain universe on the mean at
-every horizon and on the median by 6 months. The correct framing is
-**"loses to a strong control," not "carries no information."** Recommend
-that **Phase 2 present momentum term structure as description only** —
-"this name's recent pace versus its own longer-run pace," framed as context
-alongside the existing 12-month rank — **and make no claim that the
-acceleration score beats, replaces, or should reorder the trailing
-12-month leader ranking.** Do not use it as a standalone ranking signal for
-surfacing purposes.
+**Do not soften this. It should also not be over-extended.** Earlier
+drafts additionally claimed the acceleration score "modestly beats the
+plain universe" and that the fade flag shows "a small but real,
+horizon-growing signal." Both claims relied on the same invalid
+unpaired-median comparison and do not survive the paired correction in §2
+and §4: accelerating-vs-universe and fading-vs-universe hit rates sit at
+47–58 out of 102 (coin-flip range), with signs that flip between median and
+mean within the same horizon. **Neither the score's apparent edge over the
+universe nor the fade flag's apparent signal is distinguishable from noise
+in this study.** The only claim with real support is the comparison Vantage
+actually cares about: the acceleration score, as constructed, **loses to
+the 12-month-rank control it would have to beat to be worth shipping.**
 
-The fade flag (§4) is a narrower, softer case: a small, real,
-horizon-growing median signal (up to -0.72pp by 6 months) that does not
-carry through cleanly on the mean. If Phase 2 wants to use it at all, it
-should be as a low-confidence secondary annotation, not a claim with
-forward-return weight attached.
+Recommend that **Phase 2 present momentum term structure as description
+only** — "this name's recent pace versus its own longer-run pace," framed
+as context alongside the existing 12-month rank — **and make no claim that
+the acceleration score beats, replaces, or should reorder the trailing
+12-month leader ranking, and no claim that either the acceleration score or
+the fade flag carries a demonstrated edge over the plain universe.** Do not
+use either as a standalone ranking or forward-return signal for surfacing
+purposes.
 
 If a future phase wants to revisit prediction more rigorously, it should
 (a) do so against a point-in-time (non-survivorship-biased) universe, since
 that bias runs in the direction that would make this already-negative
 result look better, not worse, than a clean sample would show; (b) sweep
-cohort size N, per spec §4.3, which this study did not; and (c) report both
-median and mean throughout, since §3.1 demonstrates the median-of-medians
-statistic can be blind to changes affecting up to ~5% of periods —
-precisely the periods driven by the highest-volatility names a momentum
-study most needs to handle correctly.
+cohort size N, per spec §4.3, which this study did not, and resolve the
+fading-cohort's deviation from spec §4.1 (§5) if a ranked cohort is wanted;
+and (c) build paired per-date comparison (with hit rate and dispersion, per
+spec §4.2) into the harness itself from the start, rather than as a
+post-hoc script — this document needed two separate correction passes to
+arrive at that methodology, and a harness that only ever produces
+separately-aggregated medians will keep inviting the same mistake.
