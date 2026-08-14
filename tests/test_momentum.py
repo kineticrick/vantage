@@ -177,6 +177,14 @@ def test_non_finite_drawdown_disables_disagreement():
     assert t.disagrees is False
     assert t.label == "accelerating"
 
+def test_vanishingly_small_volatility_does_not_score_infinity():
+    # Not covered by the vol > 0 check: this volatility IS positive. A window
+    # flat enough to produce a denormal stdev divides a normal pace gap
+    # straight to +inf, which would sort this name above every real one.
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=5e-324)
+    assert t.score is None
+    assert t.label == "accelerating"
+
 def test_score_is_never_non_finite_even_unnormalized():
     # use_volatility=False bypasses the division entirely; the gap itself must
     # still be a real number.

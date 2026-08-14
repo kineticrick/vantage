@@ -66,9 +66,9 @@ def annualize(r, months):
         return None
     try:
         out = base ** (12.0 / months) - 1.0
-    except OverflowError:    # float ** raises here rather than returning inf
+    except OverflowError:    # Python's float ** raises rather than returning inf
         return None
-    return out if isfinite(out) else None      # ...but numpy floats do return inf
+    return out if isfinite(out) else None      # belt and braces
 
 
 def _safe_float(x):
@@ -139,6 +139,8 @@ def classify(metrics, benchmark_metrics=None, volatility=None, drawdown=None,
     # nothing at all: an inf score sorts to the top of every list and a nan one
     # makes the sort order undefined. Volatility must be strictly positive --
     # zero has no scale, and a negative one would silently invert the sign.
+    # The final check is not redundant with that one: a positive but tiny
+    # volatility (a near-flat window) divides a normal gap straight to inf.
     score = None
     if p.use_volatility:
         if vol is not None and vol > 0.0:

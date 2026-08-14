@@ -94,9 +94,11 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
         # column-iteration order (parquet column order, i.e. roughly
         # alphabetical), which silently measured only the alphabetic head of
         # the fading population rather than the fading population itself.
-        # classify() DOES assign every fading name a finite `score` (score is
-        # computed before the label branch in vantage.momentum.classify, not
-        # only for the accelerating path) -- so a ranked bottom-N by score
+        # classify() DOES score fading names (`score` is computed before the
+        # label branch in vantage.momentum.classify, not only for the
+        # accelerating path; it is None only when the volatility is unusable,
+        # which no fading name hit on the dates checked) -- so a ranked
+        # bottom-N by score
         # (most decelerating first) was and is available and would have kept
         # this cohort the same size N as accelerating/leaders, matching
         # design spec §4.1's "cohorts of equal size N." We chose the full
@@ -106,10 +108,11 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
         # the ranked top-n_cohort accelerating/leaders cohorts.
         "fading": fading,
         "universe": universe,
-        # `fading` is a large share of `universe` (~34% here), so it is inside
-        # its own control: a "fading - universe" difference is mechanically
-        # attenuated toward zero. This is the un-overlapped comparison, kept
-        # as a diagnostic for reading that one.
+        # `fading` is a large share of `universe` (34.9% of it on this
+        # study's snapshot), so it sits inside its own control: a
+        # "fading - universe" difference is mechanically attenuated toward
+        # zero. This is the un-overlapped comparison, kept as a diagnostic
+        # for reading that one. run_backtest reports the share.
         "non_fading": [t for t in universe if t not in fading_set],
     }
 
@@ -139,10 +142,11 @@ def paired_stats(periods, horizon, a, b) -> dict:
 
     A difference of two separately-aggregated medians is NOT the median of the
     per-date differences -- median is not linear, so subtraction is not safe on
-    it. Two rounds of review of this study's finding turned up three separate
-    conclusions whose sign was decided by that shortcut. Pair first, aggregate
-    second; report hit rate and dispersion alongside, per design spec §4.2, so
-    a point estimate is never read on its own.
+    it. Three rounds of review of this study's finding turned up three separate
+    published conclusions whose sign was decided by that shortcut, the last of
+    them inside the section written to correct the first two. Pair first,
+    aggregate second; report hit rate and dispersion alongside, per design spec
+    §4.2, so a point estimate is never read on its own.
     """
     diffs = [p["forward"][horizon][a] - p["forward"][horizon][b] for p in periods
              if p["forward"][horizon].get(a) is not None

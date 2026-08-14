@@ -427,7 +427,7 @@ The sweep's six configurations are genuinely distinct conditions, not a
 baseline-vs-strict-gate binary; there is no single "the informative
 comparison," and treating one as such was itself part of the original error.
 
-## 4. Does the fade flag work? — corrected, twice
+## 4. Does the fade flag work? — corrected in rounds one, two and three
 
 **Round one** of review found that `tools/backtest_momentum.py` built the
 fading cohort as `fading[:n_cohort]` — a positional slice of Python
