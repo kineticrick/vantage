@@ -1,0 +1,105 @@
+# Claims tested empirically against this universe. Append an entry after each
+# study. Loaded by vantage/evidence.py into both the weekly and chat analysts.
+universe: >
+  913 US large- and mid-cap tickers (S&P 500 + Nasdaq-100 + S&P 400),
+  2016-08-15 to 2026-08-13, 102 formation dates at 21-trading-day steps,
+  forward horizons of 1, 3 and 6 months.
+
+limits:
+  - Survivorship bias — the universe is today's index membership, so companies
+    removed or delisted over the decade are invisible.
+  - Overlapping forward windows — the effective sample is roughly 102 / 34 / 17
+    independent observations at 1 / 3 / 6 months, not 102.
+  - One market regime, one country, no transaction costs or position sizing.
+  - Nothing tested here reaches conventional statistical significance in either
+    direction. "Refuted" means "failed to demonstrate an edge", not "proven
+    harmful".
+
+claims:
+  - id: acceleration-beats-12m
+    claim: >
+      Ranking by return acceleration (recent annualized pace above long-run
+      pace) identifies future outperformers better than ranking by trailing
+      12-month return.
+    verdict: refuted
+    tested: "2026-08-13"
+    evidence: >
+      36 of 36 paired estimates negative across 6 parameter variants and 3
+      horizons. Median forward return, accelerating versus 12-month leaders:
+      +2.06% vs +2.43% at 1 month, +3.92% vs +7.73% at 3 months, +8.19% vs
+      +12.12% at 6 months. The accelerating cohort lost on 54 to 65 of 102
+      dates in every configuration.
+    implication: >
+      Do not rank, sort, filter or gate on the trajectory score. The return
+      term structure is still fact worth describing; it carries no forward
+      claim.
+    finding: docs/superpowers/findings/2026-08-13-momentum-backtest.md
+
+  - id: fade-flag-predicts-underperformance
+    claim: >
+      Labelling a past winner "fading" when its recent pace decays identifies
+      stocks that will underperform.
+    verdict: refuted
+    tested: "2026-08-13"
+    evidence: >
+      Fading names versus the universe, paired per date: -0.04, +0.09 and
+      -0.02 percentage points at 1, 3 and 6 months, winning 54, 47 and 52 of
+      102 dates. Non-monotonic and positive at 3 months.
+    implication: >
+      A "fading" label is not a sell or avoid signal. Do not ship the label,
+      and do not treat a weak recent month as evidence a leader is done.
+    finding: docs/superpowers/findings/2026-08-13-momentum-backtest.md
+
+  - id: trajectory-discriminates-within-leaders
+    claim: >
+      Among stocks that are already 12-month leaders, trajectory identifies
+      which of those leaders will do better.
+    verdict: refuted
+    tested: "2026-08-14"
+    evidence: >
+      Among the top 30 by trailing 12-month return, the higher-trajectory half
+      beat the lower half by -0.36, +0.81 and -0.92 percentage points at 1, 3
+      and 6 months, winning 50, 54 and 50 of 102 dates, with signs unstable
+      across horizons.
+    implication: >
+      Even conditional on a stock already being a leader, trajectory does not
+      say which leaders do better. This was the original motivating question;
+      it does not work either.
+    finding: docs/superpowers/findings/2026-08-14-conditional-and-sector-breadth.md
+
+  - id: sector-breadth-predicts-sector-returns
+    claim: >
+      A sector where many names are accelerating at once is turning, and its
+      constituents will outperform.
+    verdict: refuted
+    tested: "2026-08-14"
+    evidence: >
+      Tickers in the top-3 sectors by accelerating share versus the bottom-3:
+      -0.22, -0.77 and -0.58 percentage points, winning 48, 45 and 45 of 102
+      dates. Ranking sectors by median trajectory score instead gave +0.23,
+      -0.35 and +0.01, winning 53, 47 and 51.
+    implication: >
+      Sector breadth is descriptive dispersion, not a theme predictor. Do not
+      use it to order or select brief items.
+    finding: docs/superpowers/findings/2026-08-14-conditional-and-sector-breadth.md
+
+  - id: 12m-rank-beats-universe
+    claim: >
+      Ranking by trailing 12-month return selects stocks that outperform the
+      broad universe.
+    verdict: supported
+    tested: "2026-08-13"
+    evidence: >
+      The 12-month leader cohort beat the plain universe by +1.43, +4.62 and
+      +9.01 percentage points paired, winning 59, 71 and 69 of 102 dates; an
+      independent top-30 construction replicated it at +1.55, +2.92 and +6.10,
+      winning 65, 65 and 73. This is the only comparison of 66 across both
+      studies that clears its band.
+    implication: >
+      The existing 12-month screen is the one validated component of this
+      system. Do not displace it. Note the caveat: both backtests rank by
+      trailing 12-month return, whereas vantage/screener.py selects by a
+      ret_12m >= 1.0 threshold — the validated result belongs to
+      ranking-by-12-month-return as a principle, not to the exact selection
+      the dashboard performs.
+    finding: docs/superpowers/findings/2026-08-13-momentum-backtest.md
