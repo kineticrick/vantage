@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 import yaml
+from vantage.evidence import load_evidence
 from vantage.models import SignalSet, Brief, PortfolioContext
 from vantage.portfolio_context import load_portfolio_context
 
@@ -15,6 +16,7 @@ class ChatContext:
     signals: object = None            # SignalSet | None
     interests: dict = field(default_factory=dict)
     brief: object = None              # Brief | None
+    evidence: object = None           # Evidence | None
 
     def render(self) -> str:
         parts = []
@@ -33,6 +35,9 @@ class ChatContext:
         else:
             parts.append("Latest signals: none saved yet (suggest running the weekly pipeline).")
         parts.append(f"Interest overlay: {json.dumps(self.interests) if self.interests else 'none set'}.")
+        block = self.evidence.render() if self.evidence is not None else ""
+        if block:
+            parts.append(block)
         if self.brief is not None:
             titles = "; ".join(i.title for i in self.brief.items)
             parts.append(f"Latest brief ({self.brief.as_of}): {self.brief.executive_summary[:400]} "
@@ -72,5 +77,7 @@ def load_chat_context(settings, _portfolio_fn=None) -> ChatContext:
         except Exception:
             brief = None
 
+    evidence = load_evidence(settings.config_dir)
+
     return ChatContext(portfolio=portfolio, signals=signals,
-                       interests=interests, brief=brief)
+                       interests=interests, brief=brief, evidence=evidence)
