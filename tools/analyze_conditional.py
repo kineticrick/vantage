@@ -11,7 +11,14 @@ their forward window, so effective N is roughly 102 / 34 / 17, not 102 / 102 /
 It also runs a POSITIVE CONTROL that was not pre-registered and is counted as
 such: the top-30 leaders against the plain universe. The parent study resolved
 that effect (its only resolvable one), so a harness that cannot see it here is
-not measuring what it claims to measure.
+mechanically broken. Note what that does NOT show: the control is a large,
+low-noise effect, and detecting it says nothing about power for the much
+smaller effects the two experiments test. A null from this harness is absence
+of evidence, not evidence of absence -- read the per-row dispersion and
+effective N, not the control, to judge how small an effect could have hidden.
+Note also that this cohort is a pure RANK; `vantage/screener.py` flags a leader
+on a `ret_12m >= 1.0` THRESHOLD, so these numbers are not what the dashboard
+surfaces.
 
 Run:  .venv/bin/python tools/analyze_conditional.py
 Tooling only.

@@ -37,15 +37,28 @@ prediction — that both would — held.**
   43/102 (z = -1.58) — and it points the *wrong* way for the hypothesis.
 
 **The only thing in this study that is nominally significant is a post-hoc
-positive control, and it belongs to the incumbent.** The top-30 12-month
-leader cohort beats the plain universe by paired medians of **+1.55 / +2.92 /
-+6.10pp**, winning on **65 / 65 / 73 of 102** dates (21d z = +2.77, two-sided
-p ≈ 0.006; 126d t = +2.20, p ≈ 0.04). That replicates the parent study's one
-resolvable effect, on a different cohort definition (top 30, not top 15). It
-is stated here with its multiple-comparisons context immediately attached, in
-§5, not in a footnote: **it does not clear a Bonferroni threshold over this
-study's own 33 tests** (which would require |z| ≥ 3.17), and it is one
-comparison out of 66 run across the two phases of this project.
+positive control, and it belongs to ranking by trailing 12-month return —
+not to anything either experiment built.** The top-30 12-month leader cohort
+beats the plain universe by paired medians of **+1.55 / +2.92 / +6.10pp**,
+winning on **65 / 65 / 73 of 102** dates (21d z = +2.77, two-sided p ≈ 0.006;
+126d t = +2.20, p ≈ 0.04). That replicates the parent study's one resolvable
+effect, on a different cohort definition (top 30, not top 15). It is stated
+here with its multiple-comparisons context immediately attached, in §5, not in
+a footnote: **it does not clear a Bonferroni threshold over this study's own 33
+tests** (which would require |z| ≥ 3.17), and it is one comparison out of 66
+run across the two phases of this project.
+
+**Two qualifications on that control belong right next to it, not further
+down.** First, `leaders_top30` is a **pure rank** cohort and is *not* what
+`vantage/screener.py` selects — the live screener emits a `ret_12m_leader`
+signal on a **threshold**, `ret_12m >= 1.0` (`return_leader_threshold=1.0`),
+which is a different selection that on most dates surfaces a different and
+differently-sized set. The effect demonstrated here belongs to *ranking by
+trailing 12-month return* as a principle; the live screener applies that
+principle through a threshold. Do not read these numbers as "what the
+dashboard shows today" (§6). Second, the control shows the instrument can
+detect a **large, comparatively low-noise** effect on these dates — it does
+**not** establish power for the much smaller effects H1 and H2 test (§5.1).
 
 ## 1. The two pre-registered hypotheses
 
@@ -76,6 +89,19 @@ of the same idea. Exclude the `Unknown` sector and any sector with fewer than
 10 classified names at a given date.
 
 **The coordinator's pre-registered prediction: both null.**
+
+**Disclosure — "pre-registered" is not verifiable from this repository.**
+Unlike the parent study, which has a separately committed design spec
+(`docs/superpowers/specs/2026-08-13-momentum-term-structure-design.md`) dated
+before its run, this follow-up has no pre-registration artifact in the repo.
+Both hypotheses, both cohort constructions, the horizons, the exclusion rules
+and the coordinator's prediction were fixed in the dispatch that commissioned
+the work — which lives in a conversation, not in version control — and all
+three commits for this study land within seven minutes of each other. Nothing
+here was altered after a result was seen, but a reader cannot check that from
+the repository alone, and a claim of pre-registration a reader cannot check
+should be labelled as such rather than asserted. Anyone re-running this should
+commit the design before the run.
 
 ## 2. Method, in plain language
 
@@ -323,8 +349,10 @@ comparison reports three statistics (median, mean, hit rate), which is a
 further researcher degree of freedom.
 
 **Observed across the project: exactly 3 nominally significant results.** All
-three are the same comparison — the trailing 12-month rank against the plain
-universe — measured on the same snapshot and largely overlapping dates: the
+three are the same comparison — the trailing 12-month **rank** against the plain
+universe, in both studies a pure rank cohort and not the `ret_12m >= 1.0`
+threshold the live screener applies (§6) — on the same snapshot and largely
+overlapping dates: the
 parent's `leaders − universe` at 63d (71/102, z ≈ +2.29), and this study's
 `leaders_top30 − universe` at 21d (65/102, z = +2.77) and 126d (t = +2.20).
 
@@ -345,6 +373,46 @@ Two readings of that, and both belong beside the number:
 **None of this touches the 30 pre-registered tests in this study. Zero of them
 reaches |z| ≥ 1.96 or |t| ≥ 1.96.** Nothing needed correcting for
 multiplicity, because nothing came close.
+
+### 5.1 What the positive control does and does not license
+
+The control was added because a null result from an instrument with no
+demonstrated sensitivity is not informative. It is worth being precise about
+how much sensitivity it actually demonstrates, because the temptation is to
+over-claim it.
+
+**What it establishes.** The pipeline is not mechanically broken on these
+dates. Cohorts form, forward returns attach to the right dates, the pairing
+arithmetic works, and a real effect of the size the parent study found is
+visible through it. `leaders_top30 − universe` runs +1.55 / +2.92 / +6.10pp on
+paired medians against dispersions of 6.03 / 10.17 / 11.81pp — **a large,
+comparatively low-noise effect**, with a median-to-dispersion ratio of
+0.26 / 0.29 / 0.52 against 0.06 / 0.06 / 0.04 for H1's primary comparison, i.e.
+four- to thirteen-fold better than anything either experiment measures.
+
+**What it does not establish.** It says nothing about power for the specific
+effects H1 and H2 test, which are a strictly harder detection problem:
+
+- H1 asks whether trajectory sorts a set that has *already* been selected on
+  the strongest known predictor. Conditioning on the top 30 removes most of
+  the cross-sectional return spread the control is detecting, while leaving
+  the noise: H1's dispersions are 5.80 / 14.14 / 23.38pp against the control's
+  6.03 / 10.17 / 11.81pp — comparable at 21d, **1.4× and 2.0× the control's at
+  63d and 126d, around point estimates roughly an order of magnitude
+  smaller**. The control is a favourable case; H1 is not.
+- H2 compares two ~250-name cohorts that between them cover about half the
+  universe, so any sector-level effect is diluted by construction before it is
+  measured at all.
+
+**Therefore: these nulls are not evidence of absence.** They are the absence
+of evidence, produced by an instrument known to work on an easier problem. A
+reader wanting to know how small an effect could have hidden here should use
+the per-row dispersion and the effective-N figures in §3 and §4, not the
+control: at 126d, effective N ≈ 17 against a 23.38pp dispersion puts the H1
+standard error near 5.7pp, so effects well inside ±10pp are simply
+indistinguishable from zero on this design. The study remains, as the parent
+one was, unable to call any of these approaches actively harmful — and equally
+unable to certify anything smaller than a fairly large effect as absent.
 
 The 30 pre-registered tests are also fewer than 30 *independent* tests: three
 horizons are measured on the same dates and the same cohorts, `hi − top30` and
@@ -408,11 +476,27 @@ weakened by this being a follow-up:
 - **Cohort size was not swept** here either (top 30 → two 15s; top 3 → bottom 3
   sectors). A different conditioning depth is a different test, and running
   several would have multiplied the comparison count.
+- **The `leaders_top30` cohort is not what Vantage ships today** — this is the
+  parent study's §5 caveat, restored here because this document leans on that
+  cohort harder than the parent did and is meant to stand alone. The cohort is
+  a pure top-30-by-trailing-12-month-return rank with no floor, which is the
+  right control for isolating "does ranking by 12-month return beat the
+  universe." `vantage/screener.py` does something different: it emits a
+  `ret_12m_leader` signal only when `ret_12m >= 1.0`
+  (`return_leader_threshold=1.0`), a **threshold**, not a rank — so on a given
+  date it may surface far more or far fewer than 30 names, and in a flat year
+  possibly none. The live pipeline also drops only the offending metric on an
+  implausible reading, whereas this study's `metrics_at` drops the whole
+  ticker if any single window is unusable. **Do not read the
+  `leaders_top30` numbers as "what the dashboard shows today."** What the
+  control demonstrates is that *ranking by trailing 12-month return* separates
+  winners from the universe on these dates; the live screener applies that
+  principle through a threshold, and this study did not test the threshold.
 - **The positive control was not pre-registered.** It was added to check that
-  the harness can detect anything at all, is labeled post-hoc everywhere it
-  appears, and is counted in §5's tally. A null study from an instrument with
-  no demonstrated sensitivity is not informative; that is the only reason it is
-  here.
+  the harness is not mechanically broken, is labeled post-hoc everywhere it
+  appears, and is counted in §5's tally. It demonstrates sensitivity to a
+  large, low-noise effect and **not** to effects of the size H1 and H2 test —
+  see §5.1, which states precisely what it does and does not license.
 - `cache/` is git-ignored, so neither the snapshot nor the results artifact is
   committed. Every number above is read from the run's console output or from
   `cache/history/backtest-conditional-results.json`, and every number is
@@ -443,13 +527,16 @@ Three things this study adds to that recommendation rather than changing it:
    Wording that says "N of M names in this sector are accelerating" is
    descriptive and defensible; wording that says a sector is "turning" or
    "leading" is a forecast this evidence does not support.
-3. **The incumbent got a second, independent replication.** The top-30 12-month
-   leader cohort beats the universe by +1.55 / +2.92 / +6.10pp on paired
+3. **Ranking by trailing 12-month return got a second replication.** The
+   top-30 leader cohort beats the universe by +1.55 / +2.92 / +6.10pp on paired
    medians, winning 65 / 65 / 73 of 102 dates — the parent found the same with
    a top-15 cohort. Read with §5's multiple-comparisons context, this is the
-   only effect either phase can resolve at all, and it belongs to the ranking
-   Vantage already ships. That is a reason to leave the incumbent alone, not a
-   licence to build on top of it.
+   only effect either phase can resolve at all. **State it as a result about
+   the 12-month-return *principle*, not about the live screener**: the shipped
+   `ret_12m_leader` signal is a `ret_12m >= 1.0` threshold, not a top-N rank,
+   and neither study tested the threshold (§6). It is a reason to leave the
+   existing ranking alone, not a licence to build on top of it, and not
+   evidence that the threshold is well chosen.
 
 If a future phase wants to revisit any of this, the parent study's advice
 still governs — point-in-time universe, sweep cohort size, and size the study
