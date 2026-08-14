@@ -204,6 +204,14 @@ conventional significance. Finding:
 `tools/backtest_conditional.py` deliberately exposes **no** aggregate
 cross-cohort spread at all; pairing is the only cross-cohort route it offers.
 
+**Proposing a new signal?** Start with `.claude/skills/validate-signal/` — it
+walks pre-registration, cohort design with a control, paired comparison,
+multiple-comparisons accounting, the findings document, and the
+`config/evidence.yaml` entry, each step tied to a mistake this project
+actually made. `tools/backtest_core.py` holds the shared primitives a new
+study should import rather than reimplement, and `tests/test_published_findings.py`
+pins the published numbers above so a refactor can't silently move them.
+
 ### Tests
 
 ```bash
