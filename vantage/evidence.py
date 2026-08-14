@@ -74,7 +74,13 @@ def load_evidence(config_dir) -> Evidence:
         return Evidence()
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except (yaml.YAMLError, OSError) as e:
+    except Exception as e:
+        # Deliberately unconditional: the contract above is unconditional, and
+        # both callers lean on it — chat.py builds a Conversation unguarded, and
+        # run_weekly catches the analyst wholesale, so anything escaping here
+        # costs the user their brief. A cp1252 em dash in this hand-edited,
+        # dash-heavy file raises UnicodeDecodeError, which is a ValueError and
+        # slipped past the previous (yaml.YAMLError, OSError) tuple.
         logger.warning("evidence.yaml unreadable (%s); continuing without it", e)
         return Evidence()
     if not isinstance(raw, dict):

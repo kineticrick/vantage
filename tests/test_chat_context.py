@@ -51,10 +51,14 @@ def test_load_chat_context_survives_corrupt_files(tmp_path):
     (s.config_dir / "interests.yaml").write_text("!!invalid: yaml: [")
     (s.data_dir / "signals-2026-06-27.json").write_text("{not valid json")
     (s.reports_dir / "brief-2026-06-27.json").write_text("{not valid json")
+    # load_evidence is called bare here — chat.py builds a Conversation
+    # unguarded, so a bad byte in this file must not reach the REPL.
+    (s.config_dir / "evidence.yaml").write_bytes(b"limits:\n  - a \x97 dash\n")
     ctx = load_chat_context(s, _portfolio_fn=lambda pa: _pc())
     assert ctx.interests == {}
     assert ctx.signals is None
     assert ctx.brief is None
+    assert ctx.evidence.claims == []
     assert ctx.render()  # must not raise
 
 def test_chat_context_renders_the_evidence_block():

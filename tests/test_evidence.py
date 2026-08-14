@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pytest
 import yaml
@@ -37,6 +38,34 @@ def test_missing_file_yields_empty_register(tmp_path):
 def test_malformed_yaml_yields_empty_register(tmp_path):
     (tmp_path / "evidence.yaml").write_text("claims: [oops: :", encoding="utf-8")
     assert load_evidence(tmp_path).claims == []
+
+def test_unreadable_file_yields_empty_register(tmp_path, caplog):
+    # Spec §6 lists the unreadable file as a degradation case. Permission flavour.
+    path = tmp_path / "evidence.yaml"
+    path.write_text(yaml.safe_dump({"claims": [_CLAIM]}), encoding="utf-8")
+    path.chmod(0o000)
+    if os.access(path, os.R_OK):
+        path.chmod(0o644)
+        pytest.skip("running as root; chmod 000 is not enforced")
+    try:
+        with caplog.at_level(logging.WARNING):
+            ev = load_evidence(tmp_path)
+    finally:
+        path.chmod(0o644)
+    assert ev.claims == [] and ev.universe == "" and ev.limits == []
+    assert any("unreadable" in r.message for r in caplog.records)
+
+def test_non_utf8_file_yields_empty_register(tmp_path, caplog):
+    # The other unreadable flavour, and the likely one: this file is
+    # hand-edited and dense with em dashes, en dashes and curly quotes, so any
+    # editor or paste path writing cp1252/latin-1 lands a byte like 0x97 here.
+    # UnicodeDecodeError subclasses ValueError, not OSError.
+    (tmp_path / "evidence.yaml").write_bytes(
+        b"limits:\n  - survivorship bias \x97 today's membership only\n")
+    with caplog.at_level(logging.WARNING):
+        ev = load_evidence(tmp_path)
+    assert ev.claims == [] and ev.universe == "" and ev.limits == []
+    assert any("unreadable" in r.message for r in caplog.records)
 
 @pytest.mark.parametrize("payload", ["just a string", ["a", "list"], None])
 def test_non_mapping_payload_yields_empty_register(tmp_path, payload):
