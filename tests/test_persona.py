@@ -11,3 +11,13 @@ def test_persona_extracted_and_reused_by_analyst():
     # analyst still composes persona + its JSON-output instruction
     assert ANALYST_PERSONA in analyst._INSTRUCTIONS
     assert "json" in analyst._INSTRUCTIONS.lower()
+
+
+def test_persona_carries_evidence_discipline():
+    from vantage.persona import ANALYST_PERSONA
+    lowered = ANALYST_PERSONA.lower()
+    assert "evidence register" in lowered
+    # both failure modes must be addressed: crediting refuted claims, and
+    # overcorrecting into blanket dismissal
+    assert "refuted" in lowered
+    assert "absence of evidence" in lowered
