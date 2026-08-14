@@ -55,15 +55,23 @@ def test_published_paired_medians(baseline):
     # The paired figures are a different statistic from the aggregate spreads
     # above and are published separately. Pinning both is deliberate: a change
     # that made them agree would be as much a regression as one that moved
-    # either.
+    # either. Median diffs from table at findings:222-224.
     paired = baseline["paired"]
     expected = {21: -0.0121, 63: -0.0141, 126: -0.0531}
-    wins = {21: 42, 63: 44, 126: 38}
     for horizon, med in expected.items():
         cell = paired[horizon]["accelerating-leaders"]
         assert cell["median_diff"] == pytest.approx(med, abs=5e-5)
-        assert cell["wins"] == wins[horizon]
         assert cell["periods"] == 102
+
+    # Win counts derived directly from published loss counts (findings:222-224).
+    # 21d: findings says first-wins 42/102 (published directly at baseline output).
+    assert paired[21]["accelerating-leaders"]["wins"] == 42
+    # 63d: findings says 56/102 losses + 2 ties, so 102 - 56 - 2 = 44 wins.
+    assert paired[63]["accelerating-leaders"]["wins"] == 44
+    assert paired[63]["accelerating-leaders"]["ties"] == 2
+    # 126d: findings says 64/102 losses (ties omitted means 0), so 102 - 64 = 38 wins.
+    assert paired[126]["accelerating-leaders"]["wins"] == 38
+    assert paired[126]["accelerating-leaders"]["ties"] == 0
 
 
 @needs_snapshot
