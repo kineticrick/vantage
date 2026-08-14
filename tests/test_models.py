@@ -55,3 +55,16 @@ def test_signal_loads_from_legacy_json_without_name(tmp_path):
     ss = SignalSet.load(p)
     assert ss.signals[0].ticker == "MU"
     assert ss.signals[0].name is None
+
+def test_brief_round_trips_trajectory_read():
+    from vantage.models import Brief
+    b = Brief("2026-08-14", "s", [], [], "c", "m", "d",
+              trajectory_read="MU is up 632% over a year and down 7% on the month.")
+    assert Brief.from_dict(b.to_dict()).trajectory_read.startswith("MU is up")
+
+def test_brief_without_trajectory_read_loads():
+    from vantage.models import Brief
+    d = {"as_of": "2026-06-27", "executive_summary": "s", "items": [],
+         "watchlist": [], "challenge": "c", "what_im_missing": "m",
+         "disclaimer": "d"}
+    assert Brief.from_dict(d).trajectory_read == ""

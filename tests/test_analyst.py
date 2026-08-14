@@ -105,3 +105,20 @@ def test_generate_brief_loads_the_register_from_settings(tmp_path):
     generate_brief(ss, PortfolioContext(available=False, note="x"), {}, _S(),
                    _client=_FakeClient())
     assert "A tested claim." in seen["prompt"]
+
+def test_json_schema_asks_for_trajectory_read():
+    from vantage.analyst import _JSON_OUTPUT
+    assert "trajectory_read" in _JSON_OUTPUT
+
+def test_parse_brief_reads_trajectory_read():
+    from vantage.analyst import parse_brief
+    text = ('```json\n{"executive_summary": "s", "items": [], "watchlist": [],'
+            ' "challenge": "", "what_im_missing": "",'
+            ' "trajectory_read": "Memory names are rolling over on 1m."}\n```')
+    assert parse_brief(text, "2026-08-14").trajectory_read.startswith("Memory")
+
+def test_parse_brief_without_the_key_defaults_to_empty():
+    from vantage.analyst import parse_brief
+    text = ('```json\n{"executive_summary": "s", "items": [], "watchlist": [],'
+            ' "challenge": "", "what_im_missing": ""}\n```')
+    assert parse_brief(text, "2026-08-14").trajectory_read == ""

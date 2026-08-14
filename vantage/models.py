@@ -93,6 +93,7 @@ class Brief:
     challenge: str
     what_im_missing: str
     disclaimer: str
+    trajectory_read: str = ""
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -108,4 +109,5 @@ class Brief:
             challenge=d.get("challenge", ""),
             what_im_missing=d.get("what_im_missing", ""),
             disclaimer=d.get("disclaimer", ""),
+            trajectory_read=d.get("trajectory_read", ""),
         )

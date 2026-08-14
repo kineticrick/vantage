@@ -65,6 +65,14 @@ Inc. — Technology)` — since tooltips aren't reliable across mail clients. Th
 `.json` artifact stays raw and unannotated; the dashboard applies its own
 tooltip treatment when rendering it.
 
+When the analyst response includes it, the brief also carries a "Trajectory
+read" section (emailed brief, `.md`/`.html`, and the dashboard's brief detail
+panel) describing what the return term structure shows across that week's
+names — descriptive only. No forward conclusion is drawn from it, and no
+ranking, sorting, or filtering anywhere in Vantage depends on it; the reason
+is recorded in `config/evidence.yaml`. Briefs written before this field
+existed simply omit the section.
+
 ### Conversational analyst
 
 ```bash

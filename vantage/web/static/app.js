@@ -197,6 +197,9 @@ async function openBrief(asOf) {
   };
 
   body.append(label("Executive summary"), proseP("prose lede", b.executive_summary, briefFacts));
+  if (b.trajectory_read) {
+    body.append(label("Trajectory read"), proseP("prose", b.trajectory_read, briefFacts));
+  }
   for (const i of b.items || []) {
     const div = document.createElement("div");
     div.className = "brief-item";

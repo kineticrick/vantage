@@ -13,6 +13,9 @@ def render_markdown(brief, facts=None) -> str:
     out = [f"# Blind-Spot Radar — Weekly Brief ({brief.as_of})", ""]
     out += ["## Executive summary",
             _ex(brief.executive_summary, facts, set()), ""]
+    if brief.trajectory_read:
+        out += ["## Trajectory read",
+                _ex(brief.trajectory_read, facts, set()), ""]
     out.append("## Notable items")
     for i in brief.items:
         seen = set()  # one item = one section, so names don't repeat per field
@@ -44,8 +47,11 @@ def render_html(brief, facts=None) -> str:
              '<html><head><meta charset="utf-8"></head><body>',
              f"<h1>Blind-Spot Radar — Weekly Brief ({escape(brief.as_of)})</h1>",
              "<h2>Executive summary</h2>",
-             p(_ex(brief.executive_summary, facts, set())),
-             "<h2>Notable items</h2>"]
+             p(_ex(brief.executive_summary, facts, set()))]
+    if brief.trajectory_read:
+        parts += ["<h2>Trajectory read</h2>",
+                  p(_ex(brief.trajectory_read, facts, set()))]
+    parts.append("<h2>Notable items</h2>")
     for i in brief.items:
         seen = set()
         parts.append(f"<h3>{escape(i.title)}</h3>")
