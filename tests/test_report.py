@@ -113,3 +113,15 @@ def test_expansion_shared_across_fields_within_one_item():
               watchlist=[], challenge="", what_im_missing="", disclaimer="d")
     md = render_markdown(b, facts=_FACTS)
     assert md.count("MU (Micron Technology — Technology)") == 1
+
+def test_renderers_include_trajectory_read_when_set():
+    from vantage.models import Brief
+    b = Brief("2026-08-14", "s", [], [], "c", "m", "d",
+              trajectory_read="Memory names lead on 12m and lag on 1m.")
+    assert "Trajectory read" in render_markdown(b)
+    assert "Memory names lead" in render_markdown(b)
+    assert "Trajectory read" in render_html(b)
+
+def test_renderers_omit_the_section_when_empty():
+    assert "Trajectory read" not in render_markdown(_brief())
+    assert "Trajectory read" not in render_html(_brief())

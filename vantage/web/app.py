@@ -49,9 +49,7 @@ def create_app(settings=None, conversation_factory=None,
 
     @app.get("/api/signals")
     def signals():
-        ss = art.latest_signals(app.state.settings.data_dir)
-        return ss.to_dict() if ss else {"as_of": None, "signals": [],
-                                        "sector_momentum": {}}
+        return art.signals_payload(art.latest_signals(app.state.settings.data_dir))
 
     @app.get("/api/portfolio")
     def portfolio():

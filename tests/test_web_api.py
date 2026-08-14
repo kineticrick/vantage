@@ -93,6 +93,23 @@ def test_tickers_endpoint_as_of_scopes_to_named_brief(tmp_path):
     scoped = c.get("/api/tickers", params={"as_of": "2026-06-20"}).json()
     assert scoped["WDC"]["name"] == "Western Digital"
 
+def test_tickers_endpoint_serves_trajectory_read_tickers(tmp_path):
+    # The reviewer's reproduction: an older brief whose ONLY mention of ARWR is
+    # in trajectory_read. openBrief fetches /api/tickers?as_of= precisely so an
+    # older brief's tickers survive after the signals move on, so the section
+    # densest in symbols must be in scope.
+    s = _settings(tmp_path); _seed(s)
+    older = Brief("2026-06-20", "older summary", [], [], "c", "m", "d",
+                  trajectory_read="ARWR is +410% on 12m and -22% off its high.")
+    (s.reports_dir / "brief-2026-06-20.json").write_text(json.dumps(older.to_dict()))
+    (s.cache_dir / "sectors.json").write_text(json.dumps(
+        {"ARWR": {"sector": "Healthcare", "name": "Arrowhead Pharmaceuticals",
+                  "fetched": "2026-08-11"}}))
+    c = _client(s)
+    assert "ARWR" not in c.get("/api/tickers").json()   # not in the latest brief
+    scoped = c.get("/api/tickers", params={"as_of": "2026-06-20"}).json()
+    assert scoped["ARWR"]["name"] == "Arrowhead Pharmaceuticals"
+
 def test_tickers_endpoint_invalid_as_of_degrades_safely(tmp_path):
     s = _settings(tmp_path); _seed(s)
     (s.cache_dir / "sectors.json").write_text(json.dumps(
@@ -111,3 +128,10 @@ def test_tickers_endpoint_invalid_as_of_degrades_safely(tmp_path):
     body2 = r2.json()
     assert "MU" not in body2
     assert "NVDA" in body2
+
+def test_signals_endpoint_includes_term_structure(tmp_path):
+    s = _settings(tmp_path); _seed(s)
+    body = _client(s).get("/api/signals").json()
+    ts = body["signals"][0]["term_structure"]
+    assert len(ts) == 5
+    assert all("display" in e for e in ts)

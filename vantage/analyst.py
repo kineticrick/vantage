@@ -14,8 +14,14 @@ exactly these keys:
              "why_it_matters": str, "portfolio_relevance": str}],
   "watchlist": [str],
   "challenge": str,
-  "what_im_missing": str
+  "what_im_missing": str,
+  "trajectory_read": str
 }
+
+trajectory_read: describe what the return term structure shows across this week's
+names — where recent pace diverges from the 12-month figure, and which names sit
+far below their highs. Description only: the register records that this shape
+does not predict forward returns, so draw no forward conclusion from it.
 """
 
 _INSTRUCTIONS = ANALYST_PERSONA + "\n\n" + _JSON_OUTPUT
@@ -59,7 +65,8 @@ def parse_brief(response_text, as_of):
                  items=items, watchlist=payload.get("watchlist", []),
                  challenge=payload.get("challenge", ""),
                  what_im_missing=payload.get("what_im_missing", ""),
-                 disclaimer=DISCLAIMER)
+                 disclaimer=DISCLAIMER,
+                 trajectory_read=payload.get("trajectory_read", ""))
 
 def generate_brief(signal_set, portfolio_context, interests, settings,
                    _client=None, _evidence=None):

@@ -102,3 +102,73 @@ def test_relevant_ticker_facts_scans_item_fields():
     out = relevant_ticker_facts(facts, ss, None, b)
     assert out == {"AVGO": {"name": "Broadcom Inc", "sector": "Technology",
                             "common_word": False}}
+
+def test_relevant_ticker_facts_scans_trajectory_read():
+    # A ticker named ONLY in trajectory_read — nowhere in the summary, items,
+    # watchlist, signals or portfolio. The brief detail annotates that section
+    # through the same annotate() path as the rest of the prose, so its tickers
+    # have to be in the served facts map or they render as plain text.
+    from vantage.models import SignalSet, Brief
+    from vantage.tickers import TickerFacts
+    from vantage.web.artifacts import relevant_ticker_facts
+    facts = {"ARWR": TickerFacts("ARWR", "Arrowhead Pharmaceuticals", "Healthcare"),
+             "MU": TickerFacts("MU", "Micron Technology", "Technology")}
+    ss = SignalSet("2026-08-14", [], {})
+    b = Brief("2026-08-14", "no tickers in this summary", [], [], "", "", "d",
+              trajectory_read="ARWR leads on 12m but sits well off its high.")
+    out = relevant_ticker_facts(facts, ss, None, b)
+    assert out == {"ARWR": {"name": "Arrowhead Pharmaceuticals",
+                            "sector": "Healthcare", "common_word": False}}
+
+def test_signals_payload_enriches_each_signal():
+    from vantage.models import SignalSet, Signal
+    from vantage.web.artifacts import signals_payload
+    ss = SignalSet("2026-08-14", [
+        Signal("MU", "ret_12m_leader", 6.317, 1, "Technology", "Micron",
+               {"ret_1m": -0.073, "ret_12m": 6.317})], {})
+    payload = signals_payload(ss)
+    ts = payload["signals"][0]["term_structure"]
+    assert [e["label"] for e in ts] == ["1m", "3m", "6m", "12m", "off high"]
+    assert ts[0]["display"] == "-7.3%"
+    assert ts[2]["display"] == "--"          # absent metric keeps its column
+    assert payload["as_of"] == "2026-08-14"
+
+def test_signals_payload_of_none_is_the_empty_shape():
+    from vantage.web.artifacts import signals_payload
+    assert signals_payload(None) == {"as_of": None, "signals": [],
+                                     "sector_momentum": {}}
+
+def test_headline_and_12m_cell_are_the_same_string():
+    # A ret_12m_leader's Signal.value IS metrics["ret_12m"]. The row headline and
+    # the 12m cell sit near-vertically aligned on the same row, so one float must
+    # not render as two different strings.
+    from vantage.models import SignalSet, Signal
+    from vantage.web.artifacts import build_overview, signals_payload
+    ss = SignalSet("2026-08-14", [
+        Signal("MU", "ret_12m_leader", 6.317, 1, "Technology", "Micron",
+               {"ret_1m": -0.073, "ret_12m": 6.317})], {})
+    sig = signals_payload(ss)["signals"][0]
+    assert sig["value_display"] == "+632%"
+    assert sig["term_structure"][3]["display"] == sig["value_display"]
+    leader = build_overview(ss, None, None)["top_leaders"][0]
+    assert leader["value_display"] == "+632%"
+    assert leader["term_structure"][3]["display"] == leader["value_display"]
+
+def test_volume_spike_headline_stays_a_ratio():
+    # A spike's value is a ratio, not a return — it must not go through
+    # format_pct, but it is still formatted server-side.
+    from vantage.models import SignalSet, Signal
+    from vantage.web.artifacts import build_overview, signals_payload, value_display
+    ss = SignalSet("2026-08-14", [Signal("XYZ", "volume_spike", 3.14, 0, "Energy")], {})
+    assert signals_payload(ss)["signals"][0]["value_display"] == "3.1×"
+    assert build_overview(ss, None, None)["top_volume_spikes"][0]["value_display"] == "3.1×"
+    assert value_display("volume_spike", None) == "--"
+
+def test_build_overview_entries_carry_term_structure():
+    from vantage.models import SignalSet, Signal
+    from vantage.web.artifacts import build_overview
+    ss = SignalSet("2026-08-14", [
+        Signal("MU", "ret_12m_leader", 6.317, 1, "Technology", "Micron",
+               {"ret_1m": -0.073, "ret_12m": 6.317})], {})
+    o = build_overview(ss, None, None)
+    assert o["top_leaders"][0]["term_structure"][0]["display"] == "-7.3%"

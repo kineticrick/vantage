@@ -32,6 +32,36 @@ function cell(main, name, sector, ticker) {
   return `<div class="cell"><span>${esc(main)}</span>${sub(name || f.name, sector || f.sector)}</div>`;
 }
 
+// Third row line: the return term structure, description only. The server
+// sends the display strings; we never format a percentage here.
+//
+// Each cell repeats its column label in an aria-label — same reason annotate()
+// does it below: the visible header is a separate element with no table
+// semantics tying it to this cell, so assistive tech would otherwise hear a
+// bare run of numbers. `value === null` is the server's own "absent" marker
+// (termstructure.term_structure), so the missing case reads as words rather
+// than as "dash dash".
+function tsLine(ts) {
+  if (!ts || !ts.length) return "";
+  return `<div class="ts">${ts.map((e) =>
+    `<span class="ts-cell" aria-label="${esc(e.label + ", " +
+      (e.value == null ? "not available" : e.display))}">${esc(e.display)}</span>`
+  ).join("")}</div>`;
+}
+
+// The column legend. Without it the five numbers are unlabelled, and a column
+// nothing identifies cannot be scanned across names — which is the whole point
+// of the fixed grid. Same grid as tsLine, so the columns stay aligned with the
+// data rows beneath. Labels come from the payload, never a copy kept here.
+// aria-hidden because every data cell already carries its own aria-label; a
+// second, structurally unrelated run of labels would just be noise.
+function tsHead(items) {
+  const src = (items || []).find((i) => i.term_structure && i.term_structure.length);
+  if (!src) return "";
+  return `<div class="ts ts-head" aria-hidden="true">${src.term_structure.map((e) =>
+    `<span class="ts-cell">${esc(e.label)}</span>`).join("")}</div>`;
+}
+
 // Mirrors vantage/tickers.py: same symbol shape, same price-cue rule. The
 // stoplist verdict arrives per-ticker as `common_word` so there is only one
 // list, maintained in Python. The 1-character rule is a rule, not a list, so
@@ -83,9 +113,11 @@ async function loadOverview() {
   $("overview").innerHTML = `<h2>Overview</h2>
     <div class="note">Signals as of ${esc(o.signals_as_of) || "—"}</div>
     <div class="label">Top 12-month leaders</div>
-    ${rows(o.top_leaders, (l) => `<div class="row">
+    ${tsHead(o.top_leaders)}
+    ${rows(o.top_leaders, (l) => `<div class="row srow">
       ${cell(l.ticker, l.name, l.sector, l.ticker)}
-      <span class="${cls(l.value)}">${pct(l.value)}</span></div>`)}
+      <span class="${cls(l.value)}">${esc(l.value_display)}</span>
+      ${tsLine(l.term_structure)}</div>`)}
     <div class="label">Sector momentum</div>
     ${rows(o.sector_momentum_top, (m) => `<div class="row"><span>${esc(m.sector)}</span>
       <span class="${cls(m.value)}">${pct(m.value)}</span></div>`)}
@@ -114,11 +146,12 @@ async function loadPortfolio() {
 async function loadSignals() {
   const s = await getJSON("/api/signals");
   $("signals").innerHTML = `<h2>Signals</h2>
-    ${rows(s.signals, (sig) => `<div class="row">
+    ${tsHead(s.signals)}
+    ${rows(s.signals, (sig) => `<div class="row srow">
       ${cell([sig.ticker, sig.signal_type].filter(Boolean).join(" · "),
              sig.name, sig.sector, sig.ticker)}
-      <span class="${cls(sig.value)}">${sig.signal_type === "volume_spike"
-        ? sig.value.toFixed(1) + "×" : pct(sig.value)}</span></div>`)}`;
+      <span class="${cls(sig.value)}">${esc(sig.value_display)}</span>
+      ${tsLine(sig.term_structure)}</div>`)}`;
 }
 
 async function loadBriefs() {
@@ -186,6 +219,9 @@ async function openBrief(asOf) {
   };
 
   body.append(label("Executive summary"), proseP("prose lede", b.executive_summary, briefFacts));
+  if (b.trajectory_read) {
+    body.append(label("Trajectory read"), proseP("prose", b.trajectory_read, briefFacts));
+  }
   for (const i of b.items || []) {
     const div = document.createElement("div");
     div.className = "brief-item";
