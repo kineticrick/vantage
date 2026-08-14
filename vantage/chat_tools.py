@@ -1,5 +1,7 @@
 from vantage.data_ingest import fetch_market_data
+from vantage.momentum import drawdown_from_high
 from vantage.screener import _WINDOWS, _trailing_return, _volume_ratio, run_screener
+from vantage.termstructure import term_structure
 from vantage.universe import load_universe
 
 def get_ticker_metrics(ticker, settings, _downloader=None, _info_fn=None) -> dict:
@@ -16,6 +18,7 @@ def get_ticker_metrics(ticker, settings, _downloader=None, _info_fn=None) -> dic
             out[name] = _trailing_return(prices, lb)
         vol = md.volumes.get(ticker)
         out["volume_ratio"] = _volume_ratio(vol) if vol is not None else None
+        out["drawdown_from_high"] = drawdown_from_high(prices)
         return out
     except Exception as e:
         return {"ticker": ticker, "error": f"metrics failed: {e}"}
@@ -29,7 +32,8 @@ def run_screen(settings, return_leader_threshold=1.0, volume_spike_ratio=2.0,
         ss = run_screener(md, top_n=top_n,
                           return_leader_threshold=return_leader_threshold,
                           volume_spike_ratio=volume_spike_ratio)
-        leaders = [{"ticker": s.ticker, "ret_12m": round(s.value, 3)}
+        leaders = [{"ticker": s.ticker, "ret_12m": round(s.value, 3),
+                    "term_structure": term_structure(s.metrics)}
                    for s in ss.signals if s.signal_type == "ret_12m_leader"]
         spikes = [{"ticker": s.ticker, "volume_ratio": round(s.value, 2)}
                   for s in ss.signals if s.signal_type == "volume_spike"]

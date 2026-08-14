@@ -5,6 +5,7 @@ import yaml
 from vantage.evidence import load_evidence
 from vantage.models import SignalSet, Brief, PortfolioContext
 from vantage.portfolio_context import load_portfolio_context
+from vantage.termstructure import render_text_table
 
 def _newest(directory, pattern):
     files = sorted(Path(directory).glob(pattern))
@@ -26,12 +27,17 @@ class ChatContext:
             note = getattr(self.portfolio, "note", "") if self.portfolio else ""
             parts.append(f"Portfolio: unavailable ({note}).")
         if self.signals is not None:
-            leader_items = [f"{s.ticker}({s.value:.2f})" for s in self.signals.signals
-                            if s.signal_type == "ret_12m_leader"]
-            leaders = ", ".join(leader_items[:40])
+            leaders = [(s.ticker, s.metrics) for s in self.signals.signals
+                       if s.signal_type == "ret_12m_leader"]
+            table = render_text_table(leaders, limit=25)
             mom = ", ".join(f"{k} {v:+.0%}" for k, v in self.signals.sector_momentum.items())
-            parts.append(f"Latest signals ({self.signals.as_of}): 12mo leaders: "
-                         f"{leaders or 'none'}. Sector momentum: {mom or 'none'}.")
+            parts.append(f"Latest signals ({self.signals.as_of}). Sector momentum: "
+                         f"{mom or 'none'}.")
+            if table:
+                # Return term structure, description only — the register records
+                # that this shape does not predict forward returns.
+                parts.append("12-month leaders and their return term structure:\n"
+                             + table)
         else:
             parts.append("Latest signals: none saved yet (suggest running the weekly pipeline).")
         parts.append(f"Interest overlay: {json.dumps(self.interests) if self.interests else 'none set'}.")

@@ -66,3 +66,29 @@ def test_tool_defs_and_dispatch(tmp_path):
     out = dispatch("get_ticker_metrics", {"ticker": "MU"}, _settings(tmp_path))
     assert "ticker" in out  # ran (may be error if no network, but routed)
     assert dispatch("nope", {}, _settings(tmp_path))["error"].startswith("unknown tool: ")
+
+def test_run_screen_returns_term_structure_per_leader(tmp_path):
+    from vantage.chat_tools import run_screen
+    import pandas as pd
+    from vantage.data_ingest import MarketData
+    (tmp_path / "universe.txt").write_text("AAA\n")
+    idx = pd.date_range("2024-01-01", periods=300, freq="D")
+    rising = pd.Series([100.0 * 1.006 ** i for i in range(300)], index=idx)
+    md = MarketData(as_of="2026-08-14", prices={"AAA": rising},
+                    volumes={"AAA": pd.Series([1000.0] * 300, index=idx)},
+                    sectors={"AAA": "Tech"}, names={"AAA": "Alpha"})
+    class _S:
+        config_dir = tmp_path
+        cache_dir = None
+    out = run_screen(_S(), _market_data_fn=lambda tickers, cache_dir: md)
+    ts = out["leaders"][0]["term_structure"]
+    assert [e["label"] for e in ts] == ["1m", "3m", "6m", "12m", "off high"]
+    assert ts[3]["display"].endswith("%")
+
+def test_get_ticker_metrics_includes_drawdown():
+    from vantage.chat_tools import get_ticker_metrics
+    class _S:
+        cache_dir = "/tmp/vantage-test-cache"
+    out = get_ticker_metrics("AAPL", _S(), _downloader=_fake_download,
+                             _info_fn=_fake_sector)
+    assert "drawdown_from_high" in out

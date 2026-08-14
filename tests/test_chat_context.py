@@ -106,3 +106,18 @@ def test_load_chat_context_loads_the_register(tmp_path, monkeypatch):
                             _portfolio_fn=lambda p: PortfolioContext(available=False, note="x"))
     assert ctx.evidence is not None
     assert "A tested claim." in ctx.render()
+
+def test_render_includes_the_term_structure_table():
+    from vantage.chat_context import ChatContext
+    from vantage.models import SignalSet, Signal
+    ss = SignalSet("2026-08-14", [
+        Signal("MU", "ret_12m_leader", 6.317, 1, "Technology", "Micron",
+               {"ret_1m": -0.073, "ret_3m": 0.092, "ret_6m": 1.266,
+                "ret_12m": 6.317, "drawdown_from_high": -0.123})], {})
+    text = ChatContext(signals=ss).render()
+    assert "off high" in text
+    assert "-7.3%" in text and "+632%" in text and "-12.3%" in text
+
+def test_render_without_signals_is_unchanged():
+    from vantage.chat_context import ChatContext
+    assert "off high" not in ChatContext().render()
