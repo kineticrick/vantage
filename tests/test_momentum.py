@@ -1,6 +1,6 @@
 import pytest
 from vantage.momentum import (WINDOW_MONTHS, MomentumParams, Trajectory,
-                              annualize, classify)
+                              annualize, classify, sector_breadth)
 
 def _m(r1, r3, r6, r12):
     return {"ret_1m": r1, "ret_3m": r3, "ret_6m": r6, "ret_12m": r12}
@@ -205,3 +205,37 @@ def test_single_day_share_interior_zero_price_is_none():
 def test_single_day_share_interior_negative_price_is_none():
     prices = _series([100.0, 100.0, -5.0, 100.0, 100.0] * 20)
     assert single_day_share(prices) is None
+
+def _traj(label, score):
+    return Trajectory(label=label, score=score)
+
+def test_sector_breadth_computes_shares_and_median():
+    trajectories = {
+        "AAA": _traj("accelerating", 2.0),
+        "BBB": _traj("accelerating", 4.0),
+        "CCC": _traj("fading", -1.0),
+        "DDD": _traj("steady", 0.5),
+    }
+    sectors = {"AAA": "Tech", "BBB": "Tech", "CCC": "Tech", "DDD": "Energy"}
+    out = sector_breadth(trajectories, sectors)
+    assert out["Tech"]["count"] == 3
+    assert out["Tech"]["accelerating_share"] == pytest.approx(2 / 3)
+    assert out["Tech"]["fading_share"] == pytest.approx(1 / 3)
+    assert out["Tech"]["median_score"] == pytest.approx(2.0)   # median of 2, 4, -1
+    assert out["Energy"]["count"] == 1
+    assert out["Energy"]["accelerating_share"] == pytest.approx(0.0)
+
+def test_sector_breadth_ignores_unknown_and_missing_sector():
+    trajectories = {"AAA": _traj("accelerating", 1.0), "ZZZ": _traj("unknown", None)}
+    out = sector_breadth(trajectories, {"AAA": "Tech"})   # ZZZ has no sector
+    assert set(out) == {"Tech"}
+    assert out["Tech"]["count"] == 1
+
+def test_sector_breadth_handles_all_scoreless_sector():
+    trajectories = {"AAA": _traj("steady", None), "BBB": _traj("steady", None)}
+    out = sector_breadth(trajectories, {"AAA": "Utilities", "BBB": "Utilities"})
+    assert out["Utilities"]["median_score"] is None
+    assert out["Utilities"]["count"] == 2
+
+def test_sector_breadth_empty_input():
+    assert sector_breadth({}, {}) == {}

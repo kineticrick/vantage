@@ -16,6 +16,7 @@ Two decisions shape everything here (see the design spec):
 Pure: no I/O, no settings, no network. Callers supply the numbers.
 """
 from dataclasses import dataclass
+from statistics import median
 import numpy as np
 import pandas as pd
 
@@ -203,3 +204,28 @@ def _tail(prices, lookback):
         return None
     s = pd.Series(prices).dropna()
     return s.iloc[-lookback:] if lookback else s
+
+
+def sector_breadth(trajectories, sectors) -> dict:
+    """Per-sector share of accelerating vs fading names.
+
+    One name accelerating is idiosyncratic; a sector accelerating in breadth is
+    a theme. Names with an unknown label, or with no sector, are excluded.
+    """
+    buckets = {}
+    for ticker, t in (trajectories or {}).items():
+        sector = (sectors or {}).get(ticker)
+        if not sector or getattr(t, "label", "unknown") == "unknown":
+            continue
+        buckets.setdefault(sector, []).append(t)
+    out = {}
+    for sector, ts in buckets.items():
+        scores = [t.score for t in ts if t.score is not None]
+        n = len(ts)
+        out[sector] = {
+            "count": n,
+            "accelerating_share": sum(t.label == "accelerating" for t in ts) / n,
+            "fading_share": sum(t.label == "fading" for t in ts) / n,
+            "median_score": median(scores) if scores else None,
+        }
+    return out
