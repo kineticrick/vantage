@@ -104,3 +104,9 @@ button:hover { filter: brightness(1.08); }
       gap: 4px; margin-top: 4px; font-size: 12px; color: var(--muted);
       font-variant-numeric: tabular-nums; }
 .ts-cell { text-align: right; }
+/* The column legend, printed once above the rows. Same grid, same track sizes
+   and the same left edge as `.ts` inside a `.row` (which has no horizontal
+   padding), so the labels sit directly over their columns. */
+.ts-head { margin: 2px 0 4px; font-size: 10.5px; letter-spacing: .7px;
+           text-transform: uppercase; padding-bottom: 3px;
+           border-bottom: 1px solid var(--line); }

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from vantage.models import SignalSet, Brief
 from vantage.tickers import TICKER_RE, is_common_word, resolve
-from vantage.termstructure import term_structure
+from vantage.termstructure import MISSING, format_pct, term_structure
 
 def latest_signals(data_dir):
     files = sorted(Path(data_dir).glob("signals-*.json"))
@@ -27,6 +27,25 @@ def read_brief_html(reports_dir, as_of):
     p = Path(reports_dir) / f"brief-{as_of}.html"
     return p.read_text(encoding="utf-8") if p.exists() else None
 
+def value_display(signal_type, value) -> str:
+    """A signal's headline number, formatted once, server-side.
+
+    A `ret_12m_leader`'s `value` *is* its `metrics["ret_12m"]` — the same float
+    the 12m term-structure cell renders. Both appear on the same row, so the
+    headline goes through `format_pct` too; otherwise one number shows up twice
+    in two formats and the reader has to guess which is right.
+
+    A volume spike's value is a ratio, not a return, so it keeps the ×N form —
+    but it is still formatted here, so the browser never formats a number.
+    """
+    if signal_type == "volume_spike":
+        try:
+            return f"{float(value):.1f}×"
+        except (TypeError, ValueError):
+            return MISSING
+    return format_pct(value)
+
+
 def signals_payload(signal_set) -> dict:
     """The signals artifact plus rendered term-structure cells per signal.
 
@@ -38,14 +57,17 @@ def signals_payload(signal_set) -> dict:
     payload = signal_set.to_dict()
     for raw, sig in zip(payload["signals"], signal_set.signals):
         raw["term_structure"] = term_structure(sig.metrics)
+        raw["value_display"] = value_display(sig.signal_type, sig.value)
     return payload
 
 def build_overview(signal_set, portfolio, latest_brief):
     leaders, spikes = [], []
     if signal_set:
         for s in signal_set.signals:
-            entry = {"ticker": s.ticker, "value": s.value, "sector": s.sector,
-                     "name": s.name, "term_structure": term_structure(s.metrics)}
+            entry = {"ticker": s.ticker, "value": s.value,
+                     "value_display": value_display(s.signal_type, s.value),
+                     "sector": s.sector, "name": s.name,
+                     "term_structure": term_structure(s.metrics)}
             if s.signal_type == "ret_12m_leader":
                 leaders.append(entry)
             elif s.signal_type == "volume_spike":
