@@ -71,7 +71,9 @@ window: roughly `horizon / step` consecutive dates overlap, putting the
 effective sample at about 102, 34 and 17 independent observations rather than
 102. At 63d the paired mean is -3.30pp against a 14.54pp standard deviation —
 a standard error of about 2.5pp at the honest N (t ≈ -1.3), or 5.8pp at 126d
-(t ≈ -0.9). **Nothing in this study clears conventional significance.** The
+(t ≈ -0.9). **No comparison involving the acceleration score or the fade flag
+clears conventional significance** (the one comparison in this study that does
+is the incumbent 12-month rank beating the plain universe — §2). The
 supportable claim is the weaker and sufficient one: *the score failed to
 demonstrate an edge over the control it would have to beat.* What carries the
 headline is not any single point estimate — it is that the sign never once
@@ -150,14 +152,37 @@ in this subsection is read from its output rather than from a side script.
 below and in §3 and §4.** Overlapping forward windows put the effective
 sample at roughly 102, 34 and 17 independent observations at 21d, 63d and
 126d (§1). A fair coin tossed that many times lands between 40–60%, 33–67%
-and 26–74% of the time respectively, about 95% of the time. **Every hit rate
-this study measures, in every cohort comparison, falls between 37.3% and
-62.7% — inside the coin-flip band at its own horizon.** No single hit rate
-reported anywhere in this document is individually distinguishable from
-chance, including the ones supporting the headline. What differs between the
-comparisons is only whether the sign is *stable* across horizons, statistics
-and parameter settings; that stability, not any individual figure, is the
-evidence.
+and 26–74% of the time respectively, about 95% of the time. **Across the four
+comparisons that bear on the acceleration score and the fade flag —
+accelerating vs leaders, accelerating vs universe, fading vs universe, fading
+vs non-fading — every hit rate this study measures falls between 37.3% and
+62.7%, inside the coin-flip band at its own horizon.** None of those figures,
+including the ones supporting the headline, is individually distinguishable
+from chance. What differs between them is only whether the sign is *stable*
+across horizons, statistics and parameter settings; that stability, not any
+individual figure, is the evidence.
+
+**One comparison is the exception, and it is not one of the four.** The
+harness also measures `leaders − universe` — the incumbent 12-month rank
+against the plain universe — and it wins on **59 / 71 / 69 of 102** dates
+(57.8% / 69.6% / 67.6%). The 3-month figure sits **outside** its own band
+(z ≈ +2.29, two-sided p ≈ 0.02); the other two are inside it. So exactly one
+hit rate in this entire study clears the standard set above, and **it belongs
+to the control, not to anything this phase built.** Paired medians for that
+pair are +1.43 / +4.62 / +9.01pp, means +1.22 / +5.04 / +9.47pp.
+
+That exception cuts toward the recommendation rather than against it. The one
+effect this study can resolve at all is that **the trailing 12-month rank
+Vantage already ships beats the plain universe** — while the acceleration
+score cannot be shown to beat either. A finding that the incumbent works is a
+reason to leave the incumbent in place, and §6 says so.
+
+An earlier draft of this section claimed the 37.3–62.7% range covered "every
+cohort comparison" this study measures. It covered four of the five; the
+fifth was added to the harness in the same round that wrote the sentence, and
+the verification pass that checked the range enumerated the same four. Named
+here rather than silently narrowed, consistent with the rest of this
+document.
 
 **Accelerating − universe**, paired per date:
 
@@ -600,8 +625,11 @@ effective N is about 102, 34 and 17, not 102 three times over. At those
 sample sizes the paired accelerating − leaders means (-0.92 / -3.30 /
 -5.35pp against standard deviations of 7.5 / 14.5 / 23.7pp) carry standard
 errors of roughly 0.7 / 2.5 / 5.8pp, i.e. |t| ≤ 1.4 at every horizon.
-**Nothing in this study reaches conventional significance, in either
-direction.** Read naively at N=102 the 63d and 126d figures would show t ≈
+**Nothing this study measures about the acceleration score or the fade flag
+reaches conventional significance, in either direction.** (The single
+exception anywhere in the study runs the other way and concerns neither: the
+`leaders − universe` hit rate at 63d, 71/102, z ≈ +2.29 — the control beating
+the universe. See §2.) Read naively at N=102 the 63d and 126d figures would show t ≈
 -2.3 and look decisive; that is precisely the reading the overlap forbids.
 The correct summary is that the acceleration score **failed to demonstrate an
 edge over the control**, not that it was shown to destroy value. That
@@ -752,6 +780,19 @@ gate's apparent effect is distinguishable from noise in this study.** Every
 secondary claim once layered on top of the headline has now been withdrawn;
 the headline is what is left, and it is the comparison Vantage actually cares
 about.
+
+**There is a positive result here, and it belongs to the incumbent.** Of the
+15 hit rates this study measures across its five cohort comparisons, exactly
+one clears the significance standard §2 applies to all of them: `leaders −
+universe` at 63d, where the trailing 12-month rank beats the plain universe
+on **71 of 102** formation dates (69.6%, z ≈ +2.29, p ≈ 0.02), with paired
+medians of +1.43 / +4.62 / +9.01pp across the three horizons. It is a single
+cell and it should not be over-read either — but it is the only effect in
+this study that survives its own standard, and it says the ranking Vantage
+already ships is doing something. The recommendation below therefore rests on
+two legs rather than one: the acceleration score cannot be shown to beat the
+incumbent, *and* the incumbent can be shown to beat the universe. Both point
+the same way.
 
 Recommend that **Phase 2 present momentum term structure as description
 only** — "this name's recent pace versus its own longer-run pace," framed
