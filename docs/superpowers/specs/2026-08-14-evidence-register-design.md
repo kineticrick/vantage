@@ -160,6 +160,18 @@ unconditionally.
   it through.
 - **`vantage/persona.py`** — gains the standing instruction in §4.
 
+**Deviation as built (`run_weekly.py`).** The register is loaded inside
+`vantage/analyst.py::generate_brief` — `_evidence=None` means "load from
+`settings.config_dir`", with the parameter kept as a test seam — rather than in
+`run_weekly.py` as this section states. `run_weekly.py` is unchanged. The reason
+is that `generate_brief` and `load_chat_context` are then the only two loaders,
+one per analyst, both reading `settings.config_dir`, and each covered by a test
+that the register reaches its prompt
+(`test_generate_brief_loads_the_register_from_settings`,
+`test_load_chat_context_loads_the_register`). Loading in `run_weekly.py` would
+have added a third path that only the weekly run exercises. `build_prompt` still
+takes `evidence` explicitly and still renders nothing for `None`.
+
 Cost is roughly 500 tokens per prompt for five claims. That is small against a
 64k-token budget, and it is the whole point of the unit.
 
@@ -213,7 +225,8 @@ narratives. Too strong and it becomes reflexively dismissive of everything,
 which is worse — the user loses a thinking partner and gains a sceptic that
 contributes nothing.
 
-Text to add to `ANALYST_PERSONA`:
+Text to add to `ANALYST_PERSONA` — this is the shipped wording, matching
+`vantage/persona.py` verbatim:
 
 ```
 EVIDENCE DISCIPLINE. You are given an evidence register: claims about this
@@ -226,11 +239,19 @@ data is presented.
 - A refuted claim does not make its underlying data worthless. Return term
   structure is still fact worth describing; it simply carries no forward
   claim. Describe it, and say so.
-- Absence of evidence is not evidence of absence. These tests had limited
-  power and stated limits. An untested idea is still worth reasoning about —
-  do not become reflexively dismissive, and do not treat "not measured" as
-  "false".
+- Absence of evidence is not evidence of absence. The register's coverage is
+  incomplete — an idea it does not contain has simply never been tested here.
+  An untested idea is still worth reasoning about — do not become reflexively
+  dismissive, and do not treat "not measured" as "false".
 ```
+
+The last bullet was corrected in review. The original draft read "These tests
+had limited power and stated limits", which was ambiguous where it mattered
+most: it invited reading "absence of evidence" as "the tests we ran were weak"
+— an argument for discounting the register's own verdicts — when the intended
+point is that the register's *coverage* is incomplete, so an idea it does not
+mention is untested rather than false. Power and limits are stated in
+`limits:` where they belong.
 
 ## 5. Error handling
 
