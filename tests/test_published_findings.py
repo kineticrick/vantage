@@ -10,7 +10,6 @@ docs/superpowers/findings/2026-08-13-momentum-backtest.md.
 Skips when cache/history/ is absent — that directory is git-ignored, so a fresh
 clone has no snapshot. It must skip, never silently pass.
 """
-import glob
 import sys
 from pathlib import Path
 
@@ -19,9 +18,18 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "tools"))
 
-SNAPSHOTS = sorted(glob.glob(str(REPO / "cache" / "history" / "prices-*.parquet")))
+# Pinned, not globbed: this test reproduces one specific published result
+# (docs/superpowers/findings/2026-08-13-momentum-backtest.md), so it must run
+# against that result's exact input. tools/fetch_history.py writes new
+# prices-{stamp}.parquet snapshots into this same directory, and fetching a
+# fresh one is the natural first step of the next study -- a glob picking
+# SNAPSHOTS[-1] would silently start comparing the published figures against a
+# different snapshot's data, which is a different experiment, not a
+# regression, and every assertion below would fail for the wrong reason.
+SNAPSHOT = REPO / "cache" / "history" / "prices-2026-08-13.parquet"
 needs_snapshot = pytest.mark.skipif(
-    not SNAPSHOTS, reason="no price snapshot in cache/history (git-ignored)")
+    not SNAPSHOT.exists(),
+    reason="findings snapshot cache/history/prices-2026-08-13.parquet absent (git-ignored)")
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +37,7 @@ def baseline():
     import pandas as pd
     from backtest_momentum import run_backtest
     from vantage.momentum import MomentumParams
-    prices = pd.read_parquet(SNAPSHOTS[-1]).sort_index()
+    prices = pd.read_parquet(SNAPSHOT).sort_index()
     return run_backtest(prices, MomentumParams())
 
 
@@ -55,7 +63,8 @@ def test_published_paired_medians(baseline):
     # The paired figures are a different statistic from the aggregate spreads
     # above and are published separately. Pinning both is deliberate: a change
     # that made them agree would be as much a regression as one that moved
-    # either. Median diffs from table at findings:222-224.
+    # either. Median diffs from table at findings §2, "Accelerating − leaders",
+    # paired per date.
     paired = baseline["paired"]
     expected = {21: -0.0121, 63: -0.0141, 126: -0.0531}
     for horizon, med in expected.items():
@@ -63,7 +72,8 @@ def test_published_paired_medians(baseline):
         assert cell["median_diff"] == pytest.approx(med, abs=5e-5)
         assert cell["periods"] == 102
 
-    # Win counts derived directly from published loss/tie counts (findings:222-224).
+    # Win counts derived directly from published loss/tie counts (findings §2,
+    # "Accelerating − leaders", paired per date).
     # 21d: findings says first-wins 42/102 (published directly at baseline output).
     assert paired[21]["accelerating-leaders"]["wins"] == 42
     # 63d: findings says 56/102 losses + 2 ties, so 102 - 56 - 2 = 44 wins.

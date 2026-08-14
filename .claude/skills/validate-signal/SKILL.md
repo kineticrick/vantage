@@ -12,8 +12,9 @@ breadth predict sector returns — and one supported, that ranking by trailing
 12-month return beats the plain universe. The register is not a list of
 failures; it is a record of what has and hasn't held up, and step 8 below
 adds to that same file regardless of which way a new study comes out. The
-process that produced these results, across two studies, was invented twice
-and improvised a third time, and it produced three separate wrong
+process that produced these results was invented for the first study,
+reinvented for the second, and improvised a third time within the second
+study's own two experiments, and it produced three separate wrong
 conclusions along the way (see step 3). Follow the steps below instead of
 rebuilding the process from scratch or skipping it.
 
@@ -105,8 +106,8 @@ the suite rather than silently rotting.
   `MAX_PLAUSIBLE_RETURN`, `formation_positions`, `metrics_at`,
   `forward_return`, `paired_stats`). Start a new study here: import from this
   module rather than reimplementing cohort formation or comparison logic.
-  `tools/` is not a package — insert `tools/` onto `sys.path` the way both
-  existing studies do, rather than adding an `__init__.py`.
+  `tools/` is not a package — insert `tools/` onto `sys.path` the way
+  `tools/backtest_conditional.py` does, rather than adding an `__init__.py`.
 - `tools/backtest_momentum.py` and `tools/backtest_conditional.py` — worked
   examples. The first is the original study with its own cohort definitions
   and a parameter sweep; the second is the pre-registered follow-up that

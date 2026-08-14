@@ -17,7 +17,7 @@ def test_windows_and_guard_are_the_published_values():
 def test_formation_positions_boundaries():
     pos = formation_positions(700, lookback=252, forward=126, step=21)
     assert pos[0] == 252
-    assert max(pos) <= 700 - 126 - 1
+    assert max(pos) == 567
     assert formation_positions(200, lookback=252, forward=126) == []
 
 def test_metrics_at_measures_backwards():
@@ -50,8 +50,13 @@ def test_paired_stats_skips_periods_missing_either_side():
 
 def test_studies_still_expose_the_primitives():
     # backtest_momentum re-exports them, so existing test modules that import
-    # from it keep working after the move.
+    # from it keep working after the move. Assert identity, not just presence:
+    # the risk this branch guards against is a near-identical *copy* drifting
+    # from the original (e.g. someone pasting these functions back into
+    # backtest_momentum.py beside the import) -- hasattr would still pass for
+    # that, `is` would not.
+    import backtest_core as bc
     import backtest_momentum as bm
-    for name in ("WINDOW_DAYS", "formation_positions", "metrics_at",
-                 "forward_return", "paired_stats"):
-        assert hasattr(bm, name), name
+    for name in ("WINDOW_DAYS", "MAX_PLAUSIBLE_RETURN", "formation_positions",
+                 "metrics_at", "forward_return", "paired_stats"):
+        assert getattr(bm, name) is getattr(bc, name), name
