@@ -189,3 +189,19 @@ def test_single_day_share_exceeds_one_when_a_day_beats_the_net_move():
 
 def test_single_day_share_flat_window_is_none():
     assert single_day_share(_series([100.0] * 10)) is None
+
+def test_realized_volatility_interior_zero_price_is_none():
+    prices = _series([100.0, 100.0, 0.0, 100.0, 100.0] * 20)
+    assert realized_volatility(prices) is None
+
+def test_realized_volatility_interior_negative_price_is_none():
+    prices = _series([100.0, 100.0, -5.0, 100.0, 100.0] * 20)
+    assert realized_volatility(prices) is None
+
+def test_single_day_share_interior_zero_price_is_none():
+    prices = _series([100.0, 100.0, 0.0, 100.0, 100.0] * 20)
+    assert single_day_share(prices) is None
+
+def test_single_day_share_interior_negative_price_is_none():
+    prices = _series([100.0, 100.0, -5.0, 100.0, 100.0] * 20)
+    assert single_day_share(prices) is None

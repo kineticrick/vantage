@@ -161,9 +161,10 @@ def realized_volatility(prices, lookback=126):
     s = _tail(prices, lookback)
     if s is None or len(s) < 20:
         return None
-    logret = np.diff(np.log(s.to_numpy(dtype="float64")))
-    if len(logret) < 2:
+    arr = s.to_numpy(dtype="float64")
+    if np.any(arr <= 0):
         return None
+    logret = np.diff(np.log(arr))
     return float(np.std(logret, ddof=1) * np.sqrt(TRADING_DAYS))
 
 
@@ -188,6 +189,8 @@ def single_day_share(prices, lookback=63):
     if s is None or len(s) < 2:
         return None
     arr = s.to_numpy(dtype="float64")
+    if np.any(arr <= 0):
+        return None
     net = arr[-1] / arr[0] - 1.0
     if net == 0:
         return None
