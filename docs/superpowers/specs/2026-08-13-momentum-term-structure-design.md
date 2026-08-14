@@ -116,8 +116,13 @@ Core entry point:
 
 ```python
 def classify(metrics, benchmark_metrics=None, volatility=None,
-             drawdown_from_high=None, params=None) -> Trajectory
+             drawdown=None, params=None) -> Trajectory
 ```
+
+The keyword is `drawdown=` (the Trajectory *field* it populates is
+`drawdown_from_high`, and there is a module-level helper of that name; the
+parameter is deliberately the shorter one so the call site does not read
+`drawdown_from_high=drawdown_from_high(prices)`).
 
 - `metrics` is the existing dict (`ret_1m`/`ret_3m`/`ret_6m`/`ret_12m`).
 - `benchmark_metrics` is the same shape for SPY; when absent, excess returns
@@ -261,10 +266,19 @@ description and make no forward-promise claims."
 ## 5. Error handling
 
 - Any ticker missing a required window yields `label="unknown"`, never an exception.
-- Zero or unavailable volatility yields `score=None` and excludes the name from
-  the accelerating ranking; it still receives a label from the pace comparison.
+  A window present but **non-finite** (`nan`/`inf`) counts as missing: `score` is a
+  sort key, and an `inf` sorts to the top of a ranked list while a `nan` makes the
+  ordering undefined, so neither may ever reach one.
+- Zero, negative, non-finite or unavailable volatility yields `score=None` and
+  excludes the name from the accelerating ranking; it still receives a label from
+  the pace comparison.
 - A missing benchmark degrades to raw (unadjusted) returns, recorded on the
-  Trajectory so downstream consumers know.
+  Trajectory so downstream consumers know. A **partial** benchmark — a dict
+  carrying some windows but not all — degrades the same way, for every window:
+  adjusting only the windows the benchmark happens to carry yields a pace gap
+  that is neither the excess answer nor the raw one. (Callers that drop
+  individual metric keys on a plausibility check, as `screener.py` does,
+  produce exactly these dicts.)
 - `classify` never raises. The study skips tickers with insufficient history at a
   given formation date and reports how many were skipped.
 

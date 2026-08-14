@@ -138,6 +138,36 @@ One-time pass that fills the `name` field for every already-cached ticker in
 added). The weekly pipeline self-heals this cache on its own as it runs, so
 this tool only exists to avoid waiting out the normal refresh cadence.
 
+### Momentum term structure
+
+`vantage/momentum.py` compares an asset's recent pace (default: trailing
+3-month annualized return) against its own long-run (trailing 12-month)
+pace to classify it as `accelerating`, `steady`, `fading`, or `unknown`,
+optionally adjusted for volatility and benchmark-relative pace. It is a
+pure module — no I/O, no settings — used only by the two tools below.
+
+`tools/fetch_history.py` (deep, ~10-year single-vintage price fetch) and
+`tools/backtest_momentum.py` (cohort backtest + parameter sweep) are
+**tooling-only**: they are run by hand for research and are never invoked
+by the weekly pipeline or the dashboard. Phase 1 ships no behavior change
+to the brief, the screener, or the dashboard.
+
+`run_backtest` reports each cohort's forward return two ways, and the
+difference between them matters: the aggregate median/mean per cohort, and
+the **paired** per-date differences (`paired`) with hit rate and dispersion.
+A difference of two separately-aggregated medians is not the median of the
+per-date differences — median is not linear — and reading the first as if it
+were the second reversed three conclusions in the finding below before it was
+caught. Use `paired`. `per_date` retains the raw per-formation-date series so
+a comparison between two runs (e.g. two parameter settings) can be paired
+too.
+
+The backtest asked whether the acceleration score predicts forward returns
+better than the trailing 12-month rank Vantage uses today. Finding (a
+negative result — the score did not beat 12-month momentum in this
+backtest):
+`docs/superpowers/findings/2026-08-13-momentum-backtest.md`.
+
 ### Tests
 
 ```bash
