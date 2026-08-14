@@ -180,15 +180,18 @@ def test_run_period_fading_cohort_is_not_capped_at_n_cohort():
 
 
 def test_run_period_excludes_nan_scored_ticker_from_accelerating_cohort(monkeypatch):
-    # Known hazard (carried forward from an earlier task's review): classify()
-    # can hand back a Trajectory labeled "accelerating" whose .score is NaN
-    # (this happens for real when volatility itself is NaN, which classify()
-    # does not coerce to None). A NaN score must never let a ticker into the
-    # accelerating cohort -- NaN comparisons are all False, so a NaN sort key
-    # produces a silently arbitrary, unstable order rather than an error.
-    # Monkeypatch classify() so the hazard is exercised deterministically,
-    # independent of exactly which real price pattern triggers a NaN
-    # volatility inside vantage.momentum.
+    # Known hazard (carried forward from an earlier task's review): a
+    # Trajectory labeled "accelerating" whose .score is NaN must never enter
+    # the accelerating cohort -- NaN comparisons are all False, so a NaN sort
+    # key produces a silently arbitrary, unstable order rather than an error.
+    #
+    # vantage.momentum.classify() no longer PRODUCES such a Trajectory (it
+    # coerces non-finite volatility and non-finite scores to None; see
+    # test_momentum.py's finiteness tests). This test keeps the consumer-side
+    # guard honest anyway -- defense in depth, since run_period's sort is
+    # wrong for any non-finite score regardless of which producer supplied it.
+    # classify() is monkeypatched so the hazard is exercised deterministically
+    # rather than depending on the producer to misbehave.
     import backtest_momentum as bm
     from vantage.momentum import Trajectory
 

@@ -136,6 +136,94 @@ def test_soft_floor_boundary_is_inclusive():
     t = classify(_m(-0.15, 0.10, 0.08, 0.05), volatility=0.4)
     assert t.label == "accelerating"
 
+# --- finiteness at the producer -------------------------------------------
+# `score` is a sort key: an inf score sorts to the TOP of a ranked list and a
+# nan score makes the sort order undefined. Before these guards, classify()
+# emitted both. tools/backtest_momentum.py filters non-finite scores at the
+# consumer, but Phase 2's screener.py will rank on `score` without inheriting
+# that guard, so the invariant belongs here. Rows mirror design spec §5.
+
+NAN = float("nan")
+INF = float("inf")
+
+@pytest.mark.parametrize("bad", [NAN, INF, -INF])
+def test_non_finite_metric_is_unknown_with_no_score(bad):
+    # a nan pace compares False against everything (so it fell through to
+    # "steady"); an inf pace is > any long-run pace (so it read as
+    # "accelerating", with score=inf). Neither is a measurement.
+    t = classify(_m(0.05, bad, 0.35, 0.40), volatility=0.5)
+    assert t.label == "unknown"
+    assert t.score is None
+
+@pytest.mark.parametrize("bad", [NAN, INF, -INF])
+def test_non_finite_volatility_yields_no_score(bad):
+    # nan gave score=nan; inf gave score=0.0 -- a name with no measurable
+    # volatility scoring as though its pace gap were exactly zero.
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=bad)
+    assert t.score is None
+    assert t.volatility is None
+    assert t.label == "accelerating"       # the label is still computable
+
+def test_negative_volatility_does_not_score():
+    # dividing by a negative scale silently inverts the score's sign, turning
+    # the strongest accelerator into the worst-ranked name.
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=-0.5)
+    assert t.score is None
+    assert t.volatility == pytest.approx(-0.5)   # recorded, just not scored
+
+def test_non_finite_drawdown_disables_disagreement():
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5, drawdown=NAN)
+    assert t.drawdown_from_high is None
+    assert t.disagrees is False
+    assert t.label == "accelerating"
+
+def test_score_is_never_non_finite_even_unnormalized():
+    # use_volatility=False bypasses the division entirely; the gap itself must
+    # still be a real number.
+    p = MomentumParams(use_volatility=False)
+    assert classify(_m(0.05, INF, 0.35, 0.40), params=p).score is None
+
+def test_annualize_rejects_non_finite():
+    assert annualize(NAN, 3) is None
+    assert annualize(INF, 3) is None
+    assert annualize(-INF, 3) is None
+
+def test_annualize_rejects_overflow_to_infinity():
+    # A finite input whose annualized rate overflows is not a rate either.
+    # Python's float ** raises OverflowError here rather than returning inf,
+    # so this also pins spec §5's "classify never raises" -- before the guard,
+    # a large enough return propagated an OverflowError out of classify().
+    assert annualize(1e307, 1) is None
+    assert classify(_m(0.05, 1e307, 0.35, 0.40), volatility=0.5).label == "unknown"
+
+def test_partial_benchmark_degrades_to_raw_not_a_mixture():
+    # A benchmark dict missing one window used to be subtracted from the
+    # windows it did carry and not from the rest, yielding a gap that is
+    # neither the excess answer nor the raw one -- while still reporting
+    # benchmark_adjusted=True. Phase 2's screener.py drops metric keys that
+    # fail its plausibility filter, so it produces exactly these dicts.
+    raw = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5)
+    full = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5,
+                    benchmark_metrics=_m(0.02, 0.10, 0.18, 0.25))
+    partial = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5,
+                       benchmark_metrics={"ret_1m": 0.02, "ret_3m": 0.10,
+                                          "ret_6m": 0.18})
+    assert partial.score == pytest.approx(raw.score)
+    assert partial.score != pytest.approx(full.score)
+    assert partial.benchmark_adjusted is False   # and says so
+
+def test_non_finite_benchmark_window_degrades_to_raw():
+    raw = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5)
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5,
+                 benchmark_metrics=_m(0.02, NAN, 0.18, 0.25))
+    assert t.score == pytest.approx(raw.score)
+    assert t.benchmark_adjusted is False
+
+def test_non_dict_benchmark_is_ignored_not_an_exception():
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5,
+                 benchmark_metrics=[0.02, 0.10])
+    assert t.label == "accelerating" and t.benchmark_adjusted is False
+
 import numpy as np
 import pandas as pd
 from vantage.momentum import (realized_volatility, drawdown_from_high,
@@ -205,6 +293,37 @@ def test_single_day_share_interior_zero_price_is_none():
 def test_single_day_share_interior_negative_price_is_none():
     prices = _series([100.0, 100.0, -5.0, 100.0, 100.0] * 20)
     assert single_day_share(prices) is None
+
+# `_tail`'s dropna() removes NaN but not inf, and inf passes a `<= 0` price
+# check, so an infinite price used to flow all the way through and return NaN
+# -- with a RuntimeWarning, i.e. an error under `-W error`.
+
+@pytest.mark.parametrize("bad", [INF, -INF])
+def test_realized_volatility_interior_infinite_price_is_none(bad):
+    prices = _series([100.0, 100.0, bad, 100.0, 100.0] * 20)
+    assert realized_volatility(prices) is None
+
+@pytest.mark.parametrize("bad", [INF, -INF])
+def test_single_day_share_interior_infinite_price_is_none(bad):
+    prices = _series([100.0, 100.0, bad, 100.0, 100.0] * 20)
+    assert single_day_share(prices) is None
+
+@pytest.mark.parametrize("bad", [INF, -INF])
+def test_drawdown_from_high_infinite_price_is_none(bad):
+    # +inf as the peak silently returned a flat -1.0 ("down 100% from its
+    # high"); +inf as the last price returned NaN.
+    assert drawdown_from_high(_series([100.0, bad, 150.0])) is None
+    assert drawdown_from_high(_series([100.0, 150.0, bad])) is None
+
+def test_price_helpers_are_silent_under_error_on_warnings():
+    # the guards must reject the window, not compute a NaN and warn about it
+    import warnings
+    prices = _series([100.0, 100.0, INF, 100.0, 100.0] * 20)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert realized_volatility(prices) is None
+        assert single_day_share(prices) is None
+        assert drawdown_from_high(prices) is None
 
 def _traj(label, score):
     return Trajectory(label=label, score=score)

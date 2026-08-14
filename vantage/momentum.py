@@ -16,6 +16,7 @@ Two decisions shape everything here (see the design spec):
 Pure: no I/O, no settings, no network. Callers supply the numbers.
 """
 from dataclasses import dataclass
+from math import isfinite
 from statistics import median
 import numpy as np
 import pandas as pd
@@ -51,41 +52,63 @@ class Trajectory:
 
 
 def annualize(r, months):
-    """Scale a window return to an annual rate. None when undefined."""
+    """Scale a window return to an annual rate. None when undefined.
+
+    Non-finite input (nan/inf) is undefined, not a number: nan propagates
+    silently through every comparison as False, and inf sorts to the top of any
+    ranked list. Both are rejected here, at the producer, so no caller has to.
+    """
+    r = _safe_float(r)
     if r is None:
         return None
-    try:
-        base = 1.0 + float(r)
-    except (TypeError, ValueError):
-        return None
+    base = 1.0 + r
     if base <= 0.0:          # total loss: a fractional exponent would go complex
         return None
-    return base ** (12.0 / months) - 1.0
+    try:
+        out = base ** (12.0 / months) - 1.0
+    except OverflowError:    # float ** raises here rather than returning inf
+        return None
+    return out if isfinite(out) else None      # ...but numpy floats do return inf
 
 
 def _safe_float(x):
-    """Coerce to float, or None when unusable. Never raises."""
+    """Coerce to a FINITE float, or None when unusable. Never raises."""
     if x is None:
         return None
     try:
-        return float(x)
+        f = float(x)
     except (TypeError, ValueError):
         return None
+    return f if isfinite(f) else None
 
 
 def _paces(metrics, benchmark_metrics):
-    """Annualized excess pace per window, or None if any required one is missing."""
-    out = {}
+    """Annualized pace per window, and whether the benchmark was subtracted.
+
+    Returns `(paces, adjusted)`, or `(None, False)` when any required window is
+    missing or unusable.
+
+    The benchmark is all-or-nothing on purpose. Adjusting only the windows the
+    benchmark happens to carry mixes excess paces with raw ones, producing a
+    `gap` that is neither the excess answer nor the raw answer while still
+    reporting `benchmark_adjusted=True`. A partial benchmark therefore degrades
+    to fully raw returns, exactly as an absent one does (spec §5).
+    """
+    raw = {}
     for key, months in WINDOW_MONTHS.items():
         a = annualize(metrics.get(key), months)
         if a is None:
-            return None
-        if benchmark_metrics:
-            b = annualize(benchmark_metrics.get(key), months)
-            if b is not None:
-                a = a - b
-        out[key] = a
-    return out
+            return None, False
+        raw[key] = a
+    if not isinstance(benchmark_metrics, dict) or not benchmark_metrics:
+        return raw, False
+    bench = {}
+    for key, months in WINDOW_MONTHS.items():
+        b = annualize(benchmark_metrics.get(key), months)
+        if b is None:
+            return raw, False        # partial benchmark -> raw, not a mixture
+        bench[key] = b
+    return {k: v - bench[k] for k, v in raw.items()}, True
 
 
 def classify(metrics, benchmark_metrics=None, volatility=None, drawdown=None,
@@ -93,11 +116,10 @@ def classify(metrics, benchmark_metrics=None, volatility=None, drawdown=None,
     """Label and score a ticker's term structure. Never raises."""
     p = params or MomentumParams()
     metrics = metrics if isinstance(metrics, dict) else {}
-    adjusted = bool(benchmark_metrics)
-    vol = _safe_float(volatility)     # non-numeric -> unusable, not an exception
-    dd = _safe_float(drawdown)        # non-numeric -> unusable, not an exception
+    vol = _safe_float(volatility)     # non-numeric/non-finite -> unusable
+    dd = _safe_float(drawdown)        # non-numeric/non-finite -> unusable
 
-    paces = _paces(metrics, benchmark_metrics)
+    paces, adjusted = _paces(metrics, benchmark_metrics)
     if paces is None:
         return Trajectory(volatility=vol, drawdown_from_high=dd,
                           benchmark_adjusted=adjusted)
@@ -113,12 +135,18 @@ def classify(metrics, benchmark_metrics=None, volatility=None, drawdown=None,
     long_run = paces["ret_12m"]
     gap = recent - long_run
 
+    # `score` is what a ranked list sorts on, so it must be a real number or
+    # nothing at all: an inf score sorts to the top of every list and a nan one
+    # makes the sort order undefined. Volatility must be strictly positive --
+    # zero has no scale, and a negative one would silently invert the sign.
     score = None
     if p.use_volatility:
-        if vol:                              # zero or None -> no score
+        if vol is not None and vol > 0.0:
             score = gap / vol
     else:
         score = gap
+    if score is not None and not isfinite(score):
+        score = None
 
     label = "steady"
     if paces["ret_3m"] < long_run and paces["ret_6m"] < long_run:
@@ -162,8 +190,8 @@ def realized_volatility(prices, lookback=126):
     s = _tail(prices, lookback)
     if s is None or len(s) < 20:
         return None
-    arr = s.to_numpy(dtype="float64")
-    if np.any(arr <= 0):
+    arr = _finite_array(s)
+    if arr is None or np.any(arr <= 0):
         return None
     logret = np.diff(np.log(arr))
     return float(np.std(logret, ddof=1) * np.sqrt(TRADING_DAYS))
@@ -174,10 +202,13 @@ def drawdown_from_high(prices, lookback=TRADING_DAYS):
     s = _tail(prices, lookback)
     if s is None or len(s) == 0:
         return None
-    peak = float(s.max())
+    arr = _finite_array(s)
+    if arr is None:
+        return None
+    peak = float(arr.max())
     if peak <= 0:
         return None
-    return float(s.iloc[-1]) / peak - 1.0
+    return float(arr[-1]) / peak - 1.0
 
 
 def single_day_share(prices, lookback=63):
@@ -189,8 +220,8 @@ def single_day_share(prices, lookback=63):
     s = _tail(prices, lookback)
     if s is None or len(s) < 2:
         return None
-    arr = s.to_numpy(dtype="float64")
-    if np.any(arr <= 0):
+    arr = _finite_array(s)
+    if arr is None or np.any(arr <= 0):
         return None
     net = arr[-1] / arr[0] - 1.0
     if net == 0:
@@ -204,6 +235,19 @@ def _tail(prices, lookback):
         return None
     s = pd.Series(prices).dropna()
     return s.iloc[-lookback:] if lookback else s
+
+
+def _finite_array(s):
+    """The window as float64, or None if anything in it is non-finite.
+
+    `dropna()` in `_tail` removes NaN but not +/-inf, and inf survives a
+    `<= 0` price check. Left in, it turns every downstream statistic into a
+    NaN -- and raises a RuntimeWarning doing it, which is an error under
+    `-W error`. Reject the window instead of returning a NaN that looks like
+    a measurement.
+    """
+    arr = s.to_numpy(dtype="float64")
+    return arr if np.all(np.isfinite(arr)) else None
 
 
 def sector_breadth(trajectories, sectors) -> dict:
