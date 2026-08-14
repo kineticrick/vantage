@@ -123,3 +123,44 @@ def run_backtest(prices, params, n_cohort=15, benchmark="SPY",
         b = out["cohorts"][h]["leaders"]["median"]
         out["spread_vs_leaders"][h] = (a - b) if (a is not None and b is not None) else None
     return out
+
+
+SWEEP = [
+    ("baseline", MomentumParams()),
+    ("strict 1m gate", MomentumParams(min_1m_return=0.0)),
+    ("no 1m gate", MomentumParams(min_1m_return=-1.0)),
+    ("6m recent window", MomentumParams(recent_window="ret_6m")),
+    ("no vol normalization", MomentumParams(use_volatility=False)),
+    ("strength floor 15%", MomentumParams(min_recent_return=0.15)),
+]
+
+
+def main(argv=None):
+    from vantage.settings import load_settings
+    s = load_settings()
+    hist = sorted((s.cache_dir / "history").glob("prices-*.parquet"))
+    if not hist:
+        print("No history snapshot. Run tools/fetch_history.py first.")
+        return 1
+    prices = pd.read_parquet(hist[-1]).sort_index()
+    print(f"{hist[-1].name}: {len(prices.columns)} tickers, {len(prices)} sessions")
+    results = {}
+    for label, params in SWEEP:
+        out = run_backtest(prices, params)
+        results[label] = out
+        print(f"\n=== {label} — {out['periods']} formation dates ===")
+        for h in (21, 63, 126):
+            c = out["cohorts"][h]
+            fmt = lambda v: "n/a" if v is None else f"{v:+.2%}"
+            print(f"  {h:>3}d fwd  accel {fmt(c['accelerating']['median'])}"
+                  f"  leaders {fmt(c['leaders']['median'])}"
+                  f"  universe {fmt(c['universe']['median'])}"
+                  f"  fading {fmt(c['fading']['median'])}"
+                  f"  spread {fmt(out['spread_vs_leaders'][h])}")
+    out_path = s.cache_dir / "history" / "backtest-results.json"
+    out_path.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
