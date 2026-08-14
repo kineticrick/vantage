@@ -78,8 +78,9 @@ def build_overview(signal_set, portfolio, latest_brief):
 
 def _brief_text(brief) -> str:
     """All prose in a brief, concatenated — used to scope the ticker map."""
-    parts = [brief.executive_summary or "", brief.challenge or "",
-             brief.what_im_missing or "", " ".join(brief.watchlist or [])]
+    parts = [brief.executive_summary or "", brief.trajectory_read or "",
+             brief.challenge or "", brief.what_im_missing or "",
+             " ".join(brief.watchlist or [])]
     for i in brief.items:
         parts += [i.title or "", i.thesis or "", i.evidence or "",
                   i.why_it_matters or "", i.portfolio_relevance or ""]

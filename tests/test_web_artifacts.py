@@ -103,6 +103,23 @@ def test_relevant_ticker_facts_scans_item_fields():
     assert out == {"AVGO": {"name": "Broadcom Inc", "sector": "Technology",
                             "common_word": False}}
 
+def test_relevant_ticker_facts_scans_trajectory_read():
+    # A ticker named ONLY in trajectory_read — nowhere in the summary, items,
+    # watchlist, signals or portfolio. The brief detail annotates that section
+    # through the same annotate() path as the rest of the prose, so its tickers
+    # have to be in the served facts map or they render as plain text.
+    from vantage.models import SignalSet, Brief
+    from vantage.tickers import TickerFacts
+    from vantage.web.artifacts import relevant_ticker_facts
+    facts = {"ARWR": TickerFacts("ARWR", "Arrowhead Pharmaceuticals", "Healthcare"),
+             "MU": TickerFacts("MU", "Micron Technology", "Technology")}
+    ss = SignalSet("2026-08-14", [], {})
+    b = Brief("2026-08-14", "no tickers in this summary", [], [], "", "", "d",
+              trajectory_read="ARWR leads on 12m but sits well off its high.")
+    out = relevant_ticker_facts(facts, ss, None, b)
+    assert out == {"ARWR": {"name": "Arrowhead Pharmaceuticals",
+                            "sector": "Healthcare", "common_word": False}}
+
 def test_signals_payload_enriches_each_signal():
     from vantage.models import SignalSet, Signal
     from vantage.web.artifacts import signals_payload
