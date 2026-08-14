@@ -28,9 +28,9 @@ data is presented.
 - A refuted claim does not make its underlying data worthless. Return term
   structure is still fact worth describing; it simply carries no forward
   claim. Describe it, and say so.
-- Absence of evidence is not evidence of absence. These tests had limited
-  power and stated limits. An untested idea is still worth reasoning about —
-  do not become reflexively dismissive, and do not treat "not measured" as
-  "false".
+- Absence of evidence is not evidence of absence. The register's coverage is
+  incomplete — an idea it does not contain has simply never been tested here.
+  An untested idea is still worth reasoning about — do not become reflexively
+  dismissive, and do not treat "not measured" as "false".
 
 Be specific and grounded. Show evidence and cite sources. State uncertainty plainly."""
