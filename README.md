@@ -114,6 +114,16 @@ an analyst chat docked on the right.
   degrading to whichever part is available (a lookup can fail or an entry can
   lack a name). Tickers mentioned inside brief prose, the watchlist, and chat
   replies carry a hover/focus tooltip with the same information instead.
+- **Return term structure** — Overview leaders and Signals rows carry a
+  five-number line beneath the ticker: trailing 1-, 3-, 6- and 12-month
+  returns, then how far the name sits below its 52-week high ("off high"). A
+  labelled header sits above the rows, and the columns are a fixed grid, so
+  one window can be read straight down the panel. `--` in a column means that
+  number isn't available (too little price history, or an artifact written
+  before the field existed) — it is **not** zero, and the column holds its
+  place so the others stay aligned. This is description, not a
+  recommendation: nothing in Vantage ranks, sorts, filters or gates on it
+  (see `config/evidence.yaml`).
 - **Refresh data** re-runs the full quantitative pipeline (market fetch →
   screener → portfolio context) and reloads all panels on completion. This
   makes real market-data requests and takes a few minutes.
@@ -152,15 +162,22 @@ this tool only exists to avoid waiting out the normal refresh cadence.
 3-month annualized return) against its own long-run (trailing 12-month)
 pace to classify it as `accelerating`, `steady`, `fading`, or `unknown`,
 optionally adjusted for volatility and benchmark-relative pace. It is a
-pure module — no I/O, no settings — used only by the two tools below.
+pure module — no I/O, no settings — but it is **not** research-only: its
+`drawdown_from_high` is imported by `vantage/screener.py` (the weekly
+pipeline) and by `vantage/chat_tools.py` to produce the "off high" figure in
+the term structure. The classification functions are used only by the
+research tools below.
 
 `tools/fetch_history.py` (deep, ~10-year single-vintage price fetch),
 `tools/backtest_momentum.py` (cohort backtest + parameter sweep),
 `tools/backtest_conditional.py` (two follow-up experiments) and
 `tools/analyze_conditional.py` (significance context for the latter) are
 **tooling-only**: they are run by hand for research and are never invoked
-by the weekly pipeline or the dashboard. Phase 1 ships no behavior change
-to the brief, the screener, or the dashboard.
+by the weekly pipeline or the dashboard. Phase 1 — the measurement and
+backtesting work described in this section — shipped no behavior change to
+the brief, the screener, or the dashboard. (Phase 2 did: the descriptive
+term structure, above, added `drawdown_from_high` to the screener's metrics
+and a term-structure line to every dashboard row.)
 
 `run_backtest` reports each cohort's forward return two ways, and the
 difference between them matters: the aggregate median/mean per cohort, and
