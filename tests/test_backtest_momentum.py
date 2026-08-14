@@ -60,9 +60,33 @@ def test_run_period_ranks_accelerator_above_leader():
     leader = 100.0 * np.cumprod(np.full(n, 1.004))
     bench = 100.0 * np.cumprod(np.full(n, 1.0002))
     prices = _frame({"ACCEL": accel, "LEADER": leader, "SPY": bench}, n=n)
-    out = run_period(prices, n - 40, MomentumParams(), n_cohort=1)
-    assert out["accelerating"] == ["ACCEL"]
-    assert out["leaders"] == ["LEADER"]
+    # n_cohort=2 (not 1): LEADER's pace_3m and pace_12m are mathematically
+    # equal (same constant daily rate compounded), but classify() derives
+    # pace_3m via a 63-day raw return raised to the 4th power and pace_12m
+    # via a 252-day raw return raised to the 1st power -- two different
+    # floating-point paths to the same exact value, which round differently
+    # by ~1e-15 and leave a nonzero-sign `gap`. On this platform that gap is
+    # positive, so LEADER *is* labeled "accelerating" and enters the scored
+    # list (score ~0.23) alongside ACCEL (score ~17, from a real 63-day
+    # ramp). The brief's Step 4 note ("a perfectly steady ramp has
+    # pace_3m == pace_12m, so gap == 0 and it must not be labeled
+    # accelerating") is wrong in floating point -- gap is *never* exactly
+    # 0.0 for a compounded rate here, only close to it.
+    # With n_cohort=1 the earlier version of this test passed either by
+    # ACCEL alone qualifying (real signal) or, just as easily, by ACCEL
+    # being the sole survivor of a coin-flip over LEADER's ULP sign --
+    # trivially true either way and not actually proof of ranking. Asserting
+    # the full 2-element order instead proves ACCEL outranks a genuine
+    # rival: ACCEL's score comes from a deliberate, large 63-day ramp and so
+    # dominates LEADER's float-noise-scale score by ~70x regardless of which
+    # way that noise rounds, so the *order* is robust even though whether
+    # LEADER qualifies as "accelerating" at all is not.
+    out = run_period(prices, n - 40, MomentumParams(), n_cohort=2)
+    assert out["accelerating"] == ["ACCEL", "LEADER"]
+    # Only two non-benchmark tickers exist, so n_cohort=2 pulls both into
+    # "leaders" too -- the ret_12m ranking still puts LEADER first (its
+    # trailing 12m return is ~174% vs ACCEL's ~18%).
+    assert out["leaders"] == ["LEADER", "ACCEL"]
 
 def test_run_period_reports_forward_returns_per_cohort():
     n = 500
@@ -92,6 +116,41 @@ def test_run_backtest_on_short_history_reports_zero_periods():
     prices = _frame({"AAA": _ramp(100, 0.001), "SPY": _ramp(100, 0.0005)}, n=100)
     out = run_backtest(prices, MomentumParams())
     assert out["periods"] == 0
+
+
+def test_run_backtest_reports_none_not_zero_when_nothing_accelerates():
+    # This pins the aggregation contract that the headline number depends
+    # on. Both cohorts and the empty case are already exercised elsewhere,
+    # but only by key *presence* ("median" in ...), which a regression that
+    # coerced an empty cohort's median to 0.0 instead of None would still
+    # satisfy -- and 0.0 would silently bias spread_vs_leaders toward
+    # whichever side happened to be empty. Assert the actual values.
+    #
+    # Every ticker here decelerates monotonically (daily rate slides from
+    # +0.3%/day down to -0.1%/day), so at every formation date the recent
+    # pace is below the trailing 12m pace: gap <= 0 everywhere, and no
+    # ticker is ever labeled "accelerating" by construction, not by luck.
+    n = 700
+    rates = np.linspace(0.003, -0.001, n)
+
+    def _decel(offset):
+        return 100.0 * np.cumprod(1.0 + rates + offset)
+
+    cols = {f"T{i}": _decel(i * 1e-5) for i in range(5)}
+    cols["SPY"] = 100.0 * np.cumprod(1.0 + rates)
+    out = run_backtest(_frame(cols, n=n), MomentumParams(), n_cohort=3)
+    assert out["periods"] > 0
+    for h in (21, 63, 126):
+        accel = out["cohorts"][h]["accelerating"]
+        assert accel["median"] is None
+        assert accel["mean"] is None
+        assert accel["periods"] == 0
+
+        leaders = out["cohorts"][h]["leaders"]
+        assert leaders["median"] is not None
+        assert leaders["periods"] > 0
+
+        assert out["spread_vs_leaders"][h] is None
 
 
 def test_run_period_excludes_nan_scored_ticker_from_accelerating_cohort(monkeypatch):

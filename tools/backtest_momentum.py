@@ -10,7 +10,7 @@ universe is today's index membership, so the study is survivorship-biased.
 Run:  .venv/bin/python tools/backtest_momentum.py
 Tooling only.
 """
-import json
+import json  # unused in Task 5; Task 6's CLI serializes run_backtest's output with it
 import sys
 from pathlib import Path
 
