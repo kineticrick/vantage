@@ -139,6 +139,16 @@ def test_all_required_string_fields_are_coerced(tmp_path):
     assert claim.claim == "12345"
     assert isinstance(claim.claim, str)
 
+def test_optional_and_top_level_string_fields_are_coerced(tmp_path):
+    # Per-claim universe is declared str | None; top-level universe and the
+    # limits elements are rendered verbatim. None may leak a non-str.
+    _write(tmp_path, {"universe": ["913", "tickers"], "limits": [42],
+                      "claims": [dict(_CLAIM, universe=["a", "dataset"])]})
+    ev = load_evidence(tmp_path)
+    assert isinstance(ev.universe, str)
+    assert all(isinstance(x, str) for x in ev.limits)
+    assert isinstance(ev.claims[0].universe, str)
+
 def test_by_verdict_filters():
     a = Claim("a", "c", "refuted", "d", "e", "i", "f")
     b = Claim("b", "c", "supported", "d", "e", "i", "f")

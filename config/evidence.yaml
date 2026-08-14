@@ -37,7 +37,9 @@ claims:
     implication: >
       Do not rank, sort, filter or gate on the trajectory score. The return
       term structure is still fact worth describing; it carries no forward
-      claim.
+      claim — and that binds prose as much as code. Do not write that a name's
+      returns are accelerating and let it imply the name will do well; that
+      inference is precisely the one 36 of 36 estimates failed to support.
     finding: docs/superpowers/findings/2026-08-13-momentum-backtest.md
 
   - id: fade-flag-predicts-underperformance

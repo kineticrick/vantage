@@ -37,7 +37,10 @@ class ChatContext:
         parts.append(f"Interest overlay: {json.dumps(self.interests) if self.interests else 'none set'}.")
         block = self.evidence.render() if self.evidence is not None else ""
         if block:
-            parts.append(block)
+            # Every other part is one line; the register is ~32. Without blank
+            # lines around it the next part reads as a continuation of the last
+            # claim's Source: line. build_prompt spaces the same block this way.
+            parts.append(f"\n{block}\n")
         if self.brief is not None:
             titles = "; ".join(i.title for i in self.brief.items)
             parts.append(f"Latest brief ({self.brief.as_of}): {self.brief.executive_summary[:400]} "

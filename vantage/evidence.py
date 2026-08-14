@@ -112,9 +112,12 @@ def load_evidence(config_dir) -> Evidence:
             verdict=verdict, tested=str(entry["tested"]),
             evidence=str(entry["evidence"]), implication=str(entry["implication"]),
             finding=str(entry["finding"]),
-            universe=entry.get("universe")))
+            # Optional, but declared str | None, and a hand-edited YAML list
+            # here would otherwise render as a Python repr into the prompt.
+            universe=str(entry["universe"]) if entry.get("universe") else None))
 
     limits = raw.get("limits")
-    return Evidence(universe=raw.get("universe") or "",
-                    limits=list(limits) if isinstance(limits, list) else [],
+    top_universe = raw.get("universe")
+    return Evidence(universe=str(top_universe) if top_universe else "",
+                    limits=[str(x) for x in limits] if isinstance(limits, list) else [],
                     claims=claims)

@@ -71,6 +71,17 @@ def test_chat_context_renders_the_evidence_block():
     assert "Evidence register" in text
     assert "Do not act on it." in text
 
+def test_evidence_block_is_blank_line_separated_from_its_neighbours():
+    # The block is ~32 lines among one-line parts; without the blank lines the
+    # brief line reads as a continuation of the last claim's Source: line.
+    from vantage.chat_context import ChatContext
+    from vantage.evidence import Evidence, Claim
+    ev = Evidence(claims=[Claim("id1", "A tested claim.", "refuted",
+                                "2026-08-13", "e", "i", "docs/f.md")])
+    text = ChatContext(evidence=ev).render()
+    assert "\n\n=== Evidence register" in text
+    assert "\n\nLatest brief" in text
+
 def test_chat_context_without_evidence_renders_without_the_block():
     from vantage.chat_context import ChatContext
     assert "Evidence register" not in ChatContext().render()
