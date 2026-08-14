@@ -49,7 +49,10 @@ def test_recovering_loser_is_not_accelerating():
     assert t.label != "accelerating"
 
 def test_weak_recent_return_fails_the_strength_gate():
-    t = classify(_m(0.01, 0.01, 0.05, 0.30), volatility=0.4)
+    # gap > 0 (pace_3m > pace_12m) and every other gate passes; only the raw
+    # ret_3m (0.03) sits below min_recent_return (0.05), so this must be the
+    # thing standing between this name and "accelerating".
+    t = classify(_m(0.01, 0.03, 0.06, 0.05), volatility=0.4)
     assert t.label != "accelerating"
 
 def test_collapsing_month_fails_the_soft_floor():
@@ -105,3 +108,30 @@ def test_recent_window_is_configurable():
     p = MomentumParams(recent_window="ret_6m")
     t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5, params=p)
     assert t.score == pytest.approx((1.35 ** 2 - 1 - 0.40) / 0.5)
+
+def test_non_numeric_volatility_yields_no_score_not_an_exception():
+    # score becomes unusable, but the label is still fully computable.
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility="abc")
+    assert t.score is None
+    assert t.label == "accelerating"
+
+def test_non_numeric_drawdown_disables_disagreement_not_an_exception():
+    # disagreement becomes unusable, but the label is still fully computable.
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5, drawdown="deep")
+    assert t.disagrees is False
+    assert t.label == "accelerating"
+
+def test_unknown_recent_window_is_unusable_not_an_exception():
+    p = MomentumParams(recent_window="ret_9m")
+    t = classify(_m(0.05, 0.30, 0.35, 0.40), volatility=0.5, params=p)
+    assert t.label == "unknown" and t.score is None
+
+def test_strength_gate_boundary_is_inclusive():
+    # ret_3m exactly at min_recent_return (0.05) still clears the gate.
+    t = classify(_m(0.02, 0.05, 0.15, 0.10), volatility=0.4)
+    assert t.label == "accelerating"
+
+def test_soft_floor_boundary_is_inclusive():
+    # ret_1m exactly at min_1m_return (-0.15) still clears the soft floor.
+    t = classify(_m(-0.15, 0.10, 0.08, 0.05), volatility=0.4)
+    assert t.label == "accelerating"

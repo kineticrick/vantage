@@ -60,6 +60,16 @@ def annualize(r, months):
     return base ** (12.0 / months) - 1.0
 
 
+def _safe_float(x):
+    """Coerce to float, or None when unusable. Never raises."""
+    if x is None:
+        return None
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
 def _paces(metrics, benchmark_metrics):
     """Annualized excess pace per window, or None if any required one is missing."""
     out = {}
@@ -81,20 +91,29 @@ def classify(metrics, benchmark_metrics=None, volatility=None, drawdown=None,
     p = params or MomentumParams()
     metrics = metrics if isinstance(metrics, dict) else {}
     adjusted = bool(benchmark_metrics)
+    vol = _safe_float(volatility)     # non-numeric -> unusable, not an exception
+    dd = _safe_float(drawdown)        # non-numeric -> unusable, not an exception
 
     paces = _paces(metrics, benchmark_metrics)
     if paces is None:
-        return Trajectory(volatility=volatility, drawdown_from_high=drawdown,
+        return Trajectory(volatility=vol, drawdown_from_high=dd,
                           benchmark_adjusted=adjusted)
 
-    recent = paces[p.recent_window]
+    # An unrecognized (or unhashable) recent_window can't be looked up in
+    # paces; treat that as unusable input rather than raising KeyError/TypeError.
+    try:
+        recent = paces[p.recent_window]
+    except (KeyError, TypeError):
+        return Trajectory(volatility=vol, drawdown_from_high=dd,
+                          benchmark_adjusted=adjusted)
+
     long_run = paces["ret_12m"]
     gap = recent - long_run
 
     score = None
     if p.use_volatility:
-        if volatility:                       # zero or None -> no score
-            score = gap / volatility
+        if vol:                              # zero or None -> no score
+            score = gap / vol
     else:
         score = gap
 
@@ -105,13 +124,13 @@ def classify(metrics, benchmark_metrics=None, volatility=None, drawdown=None,
         label = "accelerating"
 
     disagrees = False
-    if drawdown is not None:
-        disagrees = ((label == "accelerating" and drawdown < _DISAGREE_ACCEL_DRAWDOWN)
-                     or (label == "fading" and drawdown > _DISAGREE_FADE_DRAWDOWN))
+    if dd is not None:
+        disagrees = ((label == "accelerating" and dd < _DISAGREE_ACCEL_DRAWDOWN)
+                     or (label == "fading" and dd > _DISAGREE_FADE_DRAWDOWN))
 
     return Trajectory(label=label, score=score, pace_3m=paces["ret_3m"],
                       pace_6m=paces["ret_6m"], pace_12m=paces["ret_12m"],
-                      volatility=volatility, drawdown_from_high=drawdown,
+                      volatility=vol, drawdown_from_high=dd,
                       disagrees=disagrees, benchmark_adjusted=adjusted)
 
 
