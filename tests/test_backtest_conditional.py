@@ -305,3 +305,75 @@ def test_run_backtest_on_short_history_reports_zero_periods():
     prices = _noisy_prices(n=200, n_tickers=5)
     out = run_backtest(prices, MomentumParams(), _noisy_sector_map(5, 2))
     assert out["periods"] == 0
+
+
+# --- significance context (tools/analyze_conditional.py) ---------------------
+# A point estimate with no sample-size context is how the parent study talked
+# itself into three retracted conclusions. These pin the arithmetic that puts
+# every estimate next to its band.
+
+from analyze_conditional import (effective_n, hit_rate_z,  # noqa: E402
+                                 mean_t, paired_from_series)
+
+
+def test_effective_n_discounts_overlapping_forward_windows():
+    # 21-day formation steps against a 126-day horizon: six consecutive dates
+    # share most of one forward window, so 102 dates are ~17 observations.
+    assert effective_n(21, 102) == 102
+    assert effective_n(63, 102) == 34
+    assert effective_n(126, 102) == 17
+
+
+def test_effective_n_never_returns_zero():
+    assert effective_n(126, 3) >= 1
+
+
+def test_hit_rate_z_is_zero_at_a_coin_flip():
+    assert hit_rate_z(51, 102, 21) == pytest.approx(0.0)
+
+
+def test_hit_rate_z_shrinks_when_the_horizon_overlaps():
+    # The SAME hit rate is weaker evidence at a longer horizon, because fewer
+    # of the dates are independent. A z computed at N=102 for a 126-day
+    # horizon would overstate significance by sqrt(6).
+    short = hit_rate_z(65, 102, 21)
+    long = hit_rate_z(65, 102, 126)
+    assert short > long > 0
+    assert short / long == pytest.approx(np.sqrt(102 / 17), rel=1e-9)
+
+
+def test_hit_rate_z_matches_the_binomial_formula():
+    assert hit_rate_z(65, 102, 21) == pytest.approx(
+        (65 / 102 - 0.5) / (0.5 / np.sqrt(102)))
+
+
+def test_mean_t_uses_the_effective_sample_size():
+    assert mean_t(0.02, 0.10, 102, 63) == pytest.approx(0.02 / (0.10 / np.sqrt(34)))
+
+
+def test_mean_t_is_none_when_dispersion_is_missing_or_zero():
+    assert mean_t(0.02, None, 102, 63) is None
+    assert mean_t(0.02, 0.0, 102, 63) is None
+    assert mean_t(None, 0.1, 102, 63) is None
+
+
+def test_paired_from_series_pairs_before_aggregating():
+    # Same fixture as the parent harness's regression test: the difference of
+    # aggregate medians says "a wins by 5pp" while a actually loses on 4 of 5.
+    a = [0.10, 0.09, 0.08, 0.02, 0.01]
+    b = [0.02, 0.10, 0.09, 0.03, 0.02]
+    st = paired_from_series(a, b)
+    assert st["median_diff"] == pytest.approx(-0.01)
+    assert st["mean_diff"] == pytest.approx(0.008)
+    assert (st["wins"], st["ties"], st["periods"]) == (1, 0, 5)
+    assert float(np.median(a)) - float(np.median(b)) == pytest.approx(0.05)
+
+
+def test_paired_from_series_skips_dates_missing_either_side():
+    st = paired_from_series([0.05, None, 0.05, 0.01], [0.03, 0.03, None, 0.02])
+    assert st["periods"] == 2
+    assert st["mean_diff"] == pytest.approx((0.02 - 0.01) / 2)
+
+
+def test_paired_from_series_on_no_usable_dates_is_none():
+    assert paired_from_series([None, None], [0.01, 0.02]) is None
