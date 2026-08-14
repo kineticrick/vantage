@@ -10,7 +10,7 @@ universe is today's index membership, so the study is survivorship-biased.
 Run:  .venv/bin/python tools/backtest_momentum.py
 Tooling only.
 """
-import json  # unused in Task 5; Task 6's CLI serializes run_backtest's output with it
+import json
 import sys
 from pathlib import Path
 
@@ -86,6 +86,7 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
 
     scored.sort(key=lambda kv: -kv[1])
     leaders.sort(key=lambda kv: -kv[1])
+    fading_set = set(fading)
     cohorts = {
         "accelerating": [t for t, _ in scored[:n_cohort]],
         "leaders": [t for t, _ in leaders[:n_cohort]],
@@ -105,6 +106,11 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
         # the ranked top-n_cohort accelerating/leaders cohorts.
         "fading": fading,
         "universe": universe,
+        # `fading` is a large share of `universe` (~34% here), so it is inside
+        # its own control: a "fading - universe" difference is mechanically
+        # attenuated toward zero. This is the un-overlapped comparison, kept
+        # as a diagnostic for reading that one.
+        "non_fading": [t for t in universe if t not in fading_set],
     }
 
     forward = {}
@@ -117,15 +123,56 @@ def run_period(prices, pos, params, n_cohort=15, benchmark="SPY",
     return {**cohorts, "forward": forward, "pos": pos}
 
 
+COHORTS = ("accelerating", "leaders", "fading", "universe", "non_fading")
+
+# Every cohort against the universe baseline (design spec §4.2), plus the
+# headline A-B, plus the un-overlapped read on the fade flag.
+PAIRS = (("accelerating", "leaders"),
+         ("accelerating", "universe"),
+         ("fading", "universe"),
+         ("fading", "non_fading"),
+         ("leaders", "universe"))
+
+
+def paired_stats(periods, horizon, a, b) -> dict:
+    """Difference between two cohorts, formed per date and aggregated after.
+
+    A difference of two separately-aggregated medians is NOT the median of the
+    per-date differences -- median is not linear, so subtraction is not safe on
+    it. Two rounds of review of this study's finding turned up three separate
+    conclusions whose sign was decided by that shortcut. Pair first, aggregate
+    second; report hit rate and dispersion alongside, per design spec §4.2, so
+    a point estimate is never read on its own.
+    """
+    diffs = [p["forward"][horizon][a] - p["forward"][horizon][b] for p in periods
+             if p["forward"][horizon].get(a) is not None
+             and p["forward"][horizon].get(b) is not None]
+    return {
+        "median_diff": float(np.median(diffs)) if diffs else None,
+        "mean_diff": float(np.mean(diffs)) if diffs else None,
+        "std_diff": float(np.std(diffs, ddof=1)) if len(diffs) > 1 else None,
+        "wins": sum(d > 0 for d in diffs),      # dates where `a` beat `b`
+        "ties": sum(d == 0 for d in diffs),     # e.g. identical cohorts
+        "periods": len(diffs),
+    }
+
+
 def run_backtest(prices, params, n_cohort=15, benchmark="SPY",
                  horizons=(21, 63, 126), step=21) -> dict:
     positions = formation_positions(len(prices), forward=max(horizons), step=step)
     periods = [run_period(prices, p, params, n_cohort, benchmark, horizons)
                for p in positions]
-    out = {"periods": len(periods), "cohorts": {}, "spread_vs_leaders": {}}
+    # Design spec §5 asks the study to report how many tickers it skipped at
+    # each formation date. `universe` IS the usable set (every ticker whose
+    # metrics_at succeeded), so `screened - len(universe)` is that number.
+    screened = sum(1 for c in prices.columns if c != benchmark)
+    out = {"periods": len(periods), "positions": positions, "screened": screened,
+           "sizes": {name: [len(p[name]) for p in periods] for name in COHORTS},
+           "skipped": [screened - len(p["universe"]) for p in periods],
+           "cohorts": {}, "spread_vs_leaders": {}, "paired": {}, "per_date": {}}
     for h in horizons:
         out["cohorts"][h] = {}
-        for name in ("accelerating", "leaders", "fading", "universe"):
+        for name in COHORTS:
             vals = [p["forward"][h][name] for p in periods
                     if p["forward"][h].get(name) is not None]
             out["cohorts"][h][name] = {
@@ -136,6 +183,13 @@ def run_backtest(prices, params, n_cohort=15, benchmark="SPY",
         a = out["cohorts"][h]["accelerating"]["median"]
         b = out["cohorts"][h]["leaders"]["median"]
         out["spread_vs_leaders"][h] = (a - b) if (a is not None and b is not None) else None
+        out["paired"][h] = {f"{x}-{y}": paired_stats(periods, h, x, y)
+                            for x, y in PAIRS}
+        # Retained so any pairing this harness did not anticipate -- including
+        # one BETWEEN two runs, e.g. the same cohort under two parameter sets
+        # -- can be recomputed from the artifact instead of an ad-hoc script.
+        out["per_date"][h] = {name: [p["forward"][h][name] for p in periods]
+                              for name in COHORTS}
     return out
 
 
@@ -162,15 +216,34 @@ def main(argv=None):
     for label, params in SWEEP:
         out = run_backtest(prices, params)
         results[label] = out
+        u, sk = out["sizes"]["universe"], out["skipped"]
         print(f"\n=== {label} — {out['periods']} formation dates ===")
+        print(f"  usable tickers/date  min {min(u)}  median {np.median(u):g}"
+              f"  max {max(u)}  of {out['screened']} screened"
+              f"  (skipped: min {min(sk)}, max {max(sk)})")
+        print(f"  fading names/date    min {min(out['sizes']['fading'])}"
+              f"  median {np.median(out['sizes']['fading']):g}"
+              f"  mean {np.mean(out['sizes']['fading']):.1f}"
+              f"  max {max(out['sizes']['fading'])}"
+              f"  = {100 * np.mean(out['sizes']['fading']) / np.mean(u):.1f}% of universe")
+        fmt = lambda v: "n/a" if v is None else f"{v:+.2%}"
+        pp = lambda v: "n/a" if v is None else f"{v * 100:+.2f}pp"
         for h in (21, 63, 126):
             c = out["cohorts"][h]
-            fmt = lambda v: "n/a" if v is None else f"{v:+.2%}"
             print(f"  {h:>3}d fwd  accel {fmt(c['accelerating']['median'])}"
                   f"  leaders {fmt(c['leaders']['median'])}"
                   f"  universe {fmt(c['universe']['median'])}"
                   f"  fading {fmt(c['fading']['median'])}"
                   f"  spread {fmt(out['spread_vs_leaders'][h])}")
+        # The aggregate spread above is a difference of two separately
+        # aggregated medians. It is NOT the paired answer -- print both, so
+        # nobody has to remember which one they are looking at.
+        for h in (21, 63, 126):
+            for key, st in out["paired"][h].items():
+                print(f"  {h:>3}d paired {key:<24} median {pp(st['median_diff'])}"
+                      f"  mean {pp(st['mean_diff'])}  sd {pp(st['std_diff'])}"
+                      f"  first-wins {st['wins']}/{st['periods']}"
+                      f"  ties {st['ties']}")
     out_path = s.cache_dir / "history" / "backtest-results.json"
     out_path.write_text(json.dumps(results, indent=2, default=str), encoding="utf-8")
     return 0
