@@ -5,11 +5,15 @@ description: Use when proposing, evaluating, or shipping any new market signal, 
 
 # Validating a new market signal
 
-Vantage has tested three market hypotheses — does the acceleration score beat
-12-month rank, does the fade flag predict underperformance, does trajectory
-discriminate among leaders, does sector breadth predict sector returns — and
-refuted all of them. The process that produced those results was invented
-twice and improvised a third time, and it produced three separate wrong
+`config/evidence.yaml` currently holds five tested claims: four refuted —
+does the acceleration score beat 12-month rank, does the fade flag predict
+underperformance, does trajectory discriminate among leaders, does sector
+breadth predict sector returns — and one supported, that ranking by trailing
+12-month return beats the plain universe. The register is not a list of
+failures; it is a record of what has and hasn't held up, and step 8 below
+adds to that same file regardless of which way a new study comes out. The
+process that produced these results, across two studies, was invented twice
+and improvised a third time, and it produced three separate wrong
 conclusions along the way (see step 3). Follow the steps below instead of
 rebuilding the process from scratch or skipping it.
 
