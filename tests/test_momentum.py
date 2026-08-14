@@ -239,3 +239,35 @@ def test_sector_breadth_handles_all_scoreless_sector():
 
 def test_sector_breadth_empty_input():
     assert sector_breadth({}, {}) == {}
+
+def test_sector_breadth_scored_count_differs_from_count():
+    # A sector with 3 names but only 1 has a non-None score
+    trajectories = {
+        "AAA": _traj("accelerating", 1.0),
+        "BBB": _traj("steady", None),
+        "CCC": _traj("fading", None),
+    }
+    out = sector_breadth(trajectories, {"AAA": "Tech", "BBB": "Tech", "CCC": "Tech"})
+    assert out["Tech"]["count"] == 3
+    assert out["Tech"]["scored_count"] == 1
+    assert out["Tech"]["median_score"] == pytest.approx(1.0)
+
+def test_sector_breadth_scored_count_zero_with_all_scoreless():
+    # Confirm scored_count == 0 when median_score is None
+    trajectories = {"AAA": _traj("steady", None), "BBB": _traj("steady", None)}
+    out = sector_breadth(trajectories, {"AAA": "Utilities", "BBB": "Utilities"})
+    assert out["Utilities"]["count"] == 2
+    assert out["Utilities"]["scored_count"] == 0
+    assert out["Utilities"]["median_score"] is None
+
+def test_sector_breadth_all_accelerating():
+    # Test sector where every member is accelerating (1.0 share)
+    trajectories = {
+        "AAA": _traj("accelerating", 1.0),
+        "BBB": _traj("accelerating", 2.0),
+        "CCC": _traj("accelerating", 1.5),
+    }
+    out = sector_breadth(trajectories, {"AAA": "Tech", "BBB": "Tech", "CCC": "Tech"})
+    assert out["Tech"]["count"] == 3
+    assert out["Tech"]["accelerating_share"] == pytest.approx(1.0)
+    assert out["Tech"]["fading_share"] == pytest.approx(0.0)

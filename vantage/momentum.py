@@ -224,6 +224,7 @@ def sector_breadth(trajectories, sectors) -> dict:
         n = len(ts)
         out[sector] = {
             "count": n,
+            "scored_count": len(scores),
             "accelerating_share": sum(t.label == "accelerating" for t in ts) / n,
             "fading_share": sum(t.label == "fading" for t in ts) / n,
             "median_score": median(scores) if scores else None,
