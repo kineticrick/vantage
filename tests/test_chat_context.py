@@ -121,3 +121,13 @@ def test_render_includes_the_term_structure_table():
 def test_render_without_signals_is_unchanged():
     from vantage.chat_context import ChatContext
     assert "off high" not in ChatContext().render()
+
+def test_render_states_no_leaders_when_signals_present_but_empty():
+    from vantage.chat_context import ChatContext
+    from vantage.models import SignalSet
+    ss = SignalSet("2026-08-14", [], {})
+    text = ChatContext(signals=ss).render()
+    # Distinguishes "no leaders this week" (a fact) from a missing/failed
+    # section (a reason to distrust the context) — must say which it is.
+    assert "12mo leaders: none" in text
+    assert "off high" not in text

@@ -38,6 +38,11 @@ class ChatContext:
                 # that this shape does not predict forward returns.
                 parts.append("12-month leaders and their return term structure:\n"
                              + table)
+            else:
+                # An empty table is ambiguous between "no leaders this week"
+                # (a fact) and "the section failed to render" (a reason to
+                # distrust the context) — say which one it is.
+                parts.append("12mo leaders: none.")
         else:
             parts.append("Latest signals: none saved yet (suggest running the weekly pipeline).")
         parts.append(f"Interest overlay: {json.dumps(self.interests) if self.interests else 'none set'}.")
