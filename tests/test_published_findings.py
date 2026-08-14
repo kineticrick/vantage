@@ -63,13 +63,13 @@ def test_published_paired_medians(baseline):
         assert cell["median_diff"] == pytest.approx(med, abs=5e-5)
         assert cell["periods"] == 102
 
-    # Win counts derived directly from published loss counts (findings:222-224).
+    # Win counts derived directly from published loss/tie counts (findings:222-224).
     # 21d: findings says first-wins 42/102 (published directly at baseline output).
     assert paired[21]["accelerating-leaders"]["wins"] == 42
     # 63d: findings says 56/102 losses + 2 ties, so 102 - 56 - 2 = 44 wins.
     assert paired[63]["accelerating-leaders"]["wins"] == 44
     assert paired[63]["accelerating-leaders"]["ties"] == 2
-    # 126d: findings says 64/102 losses (ties omitted means 0), so 102 - 64 = 38 wins.
+    # 126d: findings says 64/102 losses (0 ties), so 102 - 64 = 38 wins.
     assert paired[126]["accelerating-leaders"]["wins"] == 38
     assert paired[126]["accelerating-leaders"]["ties"] == 0
 
