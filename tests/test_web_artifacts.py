@@ -102,3 +102,30 @@ def test_relevant_ticker_facts_scans_item_fields():
     out = relevant_ticker_facts(facts, ss, None, b)
     assert out == {"AVGO": {"name": "Broadcom Inc", "sector": "Technology",
                             "common_word": False}}
+
+def test_signals_payload_enriches_each_signal():
+    from vantage.models import SignalSet, Signal
+    from vantage.web.artifacts import signals_payload
+    ss = SignalSet("2026-08-14", [
+        Signal("MU", "ret_12m_leader", 6.317, 1, "Technology", "Micron",
+               {"ret_1m": -0.073, "ret_12m": 6.317})], {})
+    payload = signals_payload(ss)
+    ts = payload["signals"][0]["term_structure"]
+    assert [e["label"] for e in ts] == ["1m", "3m", "6m", "12m", "off high"]
+    assert ts[0]["display"] == "-7.3%"
+    assert ts[2]["display"] == "--"          # absent metric keeps its column
+    assert payload["as_of"] == "2026-08-14"
+
+def test_signals_payload_of_none_is_the_empty_shape():
+    from vantage.web.artifacts import signals_payload
+    assert signals_payload(None) == {"as_of": None, "signals": [],
+                                     "sector_momentum": {}}
+
+def test_build_overview_entries_carry_term_structure():
+    from vantage.models import SignalSet, Signal
+    from vantage.web.artifacts import build_overview
+    ss = SignalSet("2026-08-14", [
+        Signal("MU", "ret_12m_leader", 6.317, 1, "Technology", "Micron",
+               {"ret_1m": -0.073, "ret_12m": 6.317})], {})
+    o = build_overview(ss, None, None)
+    assert o["top_leaders"][0]["term_structure"][0]["display"] == "-7.3%"

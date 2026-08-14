@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 from vantage.models import SignalSet, Brief
 from vantage.tickers import TICKER_RE, is_common_word, resolve
+from vantage.termstructure import term_structure
 
 def latest_signals(data_dir):
     files = sorted(Path(data_dir).glob("signals-*.json"))
@@ -26,12 +27,25 @@ def read_brief_html(reports_dir, as_of):
     p = Path(reports_dir) / f"brief-{as_of}.html"
     return p.read_text(encoding="utf-8") if p.exists() else None
 
+def signals_payload(signal_set) -> dict:
+    """The signals artifact plus rendered term-structure cells per signal.
+
+    The display strings are produced server-side so the browser never formats
+    a percentage — one formatter, one appearance, everywhere.
+    """
+    if signal_set is None:
+        return {"as_of": None, "signals": [], "sector_momentum": {}}
+    payload = signal_set.to_dict()
+    for raw, sig in zip(payload["signals"], signal_set.signals):
+        raw["term_structure"] = term_structure(sig.metrics)
+    return payload
+
 def build_overview(signal_set, portfolio, latest_brief):
     leaders, spikes = [], []
     if signal_set:
         for s in signal_set.signals:
             entry = {"ticker": s.ticker, "value": s.value, "sector": s.sector,
-                     "name": s.name}
+                     "name": s.name, "term_structure": term_structure(s.metrics)}
             if s.signal_type == "ret_12m_leader":
                 leaders.append(entry)
             elif s.signal_type == "volume_spike":

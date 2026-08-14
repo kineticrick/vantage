@@ -111,3 +111,10 @@ def test_tickers_endpoint_invalid_as_of_degrades_safely(tmp_path):
     body2 = r2.json()
     assert "MU" not in body2
     assert "NVDA" in body2
+
+def test_signals_endpoint_includes_term_structure(tmp_path):
+    s = _settings(tmp_path); _seed(s)
+    body = _client(s).get("/api/signals").json()
+    ts = body["signals"][0]["term_structure"]
+    assert len(ts) == 5
+    assert all("display" in e for e in ts)
