@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 import yaml
 from vantage.evidence import (VERDICTS, REQUIRED_KEYS, Claim, Evidence,
@@ -74,7 +76,39 @@ def test_yaml_date_is_coerced_to_string(tmp_path):
 def test_per_claim_universe_override_is_kept(tmp_path):
     _write(tmp_path, {"universe": "default",
                       "claims": [dict(_CLAIM, universe="a different dataset")]})
-    assert load_evidence(tmp_path).claims[0].universe == "a different dataset"
+    ev = load_evidence(tmp_path)
+    assert ev.claims[0].universe == "a different dataset"
+    assert "Universe: a different dataset" in ev.render()
+
+def test_unknown_verdict_loads_and_renders_verbatim_with_warning(tmp_path, caplog):
+    # §5: an unknown verdict is not silently normalized or dropped — it loads
+    # and renders verbatim, but a warning is logged so a hand-edit that never
+    # ran the tests is visible in the logs.
+    odd = dict(_CLAIM, id="odd-verdict", verdict="maybe-ish")
+    _write(tmp_path, {"claims": [odd]})
+    with caplog.at_level(logging.WARNING):
+        ev = load_evidence(tmp_path)
+    assert len(ev.claims) == 1
+    assert ev.claims[0].verdict == "maybe-ish"
+    assert "[MAYBE-ISH]" in ev.render()
+    assert any("odd-verdict" in r.message and "maybe-ish" in r.message
+               for r in caplog.records)
+
+def test_non_dict_claim_entries_are_skipped_with_warning(tmp_path, caplog):
+    _write(tmp_path, {"claims": ["a string", 42, None, _CLAIM]})
+    with caplog.at_level(logging.WARNING):
+        ev = load_evidence(tmp_path)
+    assert [c.id for c in ev.claims] == ["acceleration-beats-12m"]
+    assert len(caplog.records) >= 3
+
+def test_all_required_string_fields_are_coerced(tmp_path):
+    # Claim declares claim/evidence/implication as str; a bare YAML scalar
+    # (e.g. an int) must not leak through as a non-str value.
+    odd = dict(_CLAIM, id="numeric-claim", claim=12345)
+    _write(tmp_path, {"claims": [odd]})
+    claim = load_evidence(tmp_path).claims[0]
+    assert claim.claim == "12345"
+    assert isinstance(claim.claim, str)
 
 def test_by_verdict_filters():
     a = Claim("a", "c", "refuted", "d", "e", "i", "f")

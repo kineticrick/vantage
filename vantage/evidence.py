@@ -84,6 +84,8 @@ def load_evidence(config_dir) -> Evidence:
     claims = []
     for entry in entries if isinstance(entries, list) else []:
         if not isinstance(entry, dict):
+            logger.warning("evidence claim entry %r is not a mapping; skipped",
+                           entry)
             continue
         missing = [k for k in REQUIRED_KEYS if not entry.get(k)]
         if missing:
@@ -91,10 +93,18 @@ def load_evidence(config_dir) -> Evidence:
             logger.warning("evidence claim %r missing %s; skipped",
                            entry.get("id", "?"), ", ".join(missing))
             continue
+        verdict = str(entry["verdict"])
+        if verdict not in VERDICTS:
+            # §5: an unknown verdict is not dropped or normalized — it loads
+            # and renders verbatim, but this makes a hand-edit that never ran
+            # the tests visible in the logs.
+            logger.warning("evidence claim %r has unknown verdict %r "
+                           "(expected one of %s); loading verbatim",
+                           entry.get("id", "?"), verdict, VERDICTS)
         claims.append(Claim(
-            id=str(entry["id"]), claim=entry["claim"],
-            verdict=str(entry["verdict"]), tested=str(entry["tested"]),
-            evidence=entry["evidence"], implication=entry["implication"],
+            id=str(entry["id"]), claim=str(entry["claim"]),
+            verdict=verdict, tested=str(entry["tested"]),
+            evidence=str(entry["evidence"]), implication=str(entry["implication"]),
             finding=str(entry["finding"]),
             universe=entry.get("universe")))
 
