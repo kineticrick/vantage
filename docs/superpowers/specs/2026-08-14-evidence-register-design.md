@@ -55,9 +55,14 @@ limits:
   - Overlapping forward windows — effective sample is roughly 102 / 34 / 17
     independent observations at 1 / 3 / 6 months, not 102.
   - One market regime, one country, no transaction costs or position sizing.
-  - Nothing tested here reaches conventional statistical significance in either
-    direction. "Refuted" means "failed to demonstrate an edge", not "proven
-    harmful".
+  - No comparison involving a proposed new signal — the acceleration score,
+    the fade flag, sector breadth — reaches conventional statistical
+    significance in either direction; zero of the 30 pre-registered
+    comparisons in the 2026-08-14 study reach |z| or |t| of 1.96. So for every
+    refuted claim below, "refuted" means "failed to demonstrate an edge", not
+    "proven harmful". The exceptions run the other way and belong to the
+    incumbent 12-month rank, not to anything these studies proposed — see the
+    supported claim, which carries its own multiple-comparisons caveat.
 
 claims:
   - id: acceleration-beats-12m
