@@ -146,8 +146,10 @@ pace to classify it as `accelerating`, `steady`, `fading`, or `unknown`,
 optionally adjusted for volatility and benchmark-relative pace. It is a
 pure module — no I/O, no settings — used only by the two tools below.
 
-`tools/fetch_history.py` (deep, ~10-year single-vintage price fetch) and
-`tools/backtest_momentum.py` (cohort backtest + parameter sweep) are
+`tools/fetch_history.py` (deep, ~10-year single-vintage price fetch),
+`tools/backtest_momentum.py` (cohort backtest + parameter sweep),
+`tools/backtest_conditional.py` (two follow-up experiments) and
+`tools/analyze_conditional.py` (significance context for the latter) are
 **tooling-only**: they are run by hand for research and are never invoked
 by the weekly pipeline or the dashboard. Phase 1 ships no behavior change
 to the brief, the screener, or the dashboard.
@@ -167,6 +169,15 @@ better than the trailing 12-month rank Vantage uses today. Finding (a
 negative result — the score did not beat 12-month momentum in this
 backtest):
 `docs/superpowers/findings/2026-08-13-momentum-backtest.md`.
+
+Two pre-registered follow-ups asked the questions that study did not:
+whether trajectory discriminates *among* 12-month leaders (top 30 split into
+high- and low-score halves), and whether `sector_breadth` predicts sector
+forward returns. Both are null — 0 of 30 pre-registered comparisons reach
+conventional significance. Finding:
+`docs/superpowers/findings/2026-08-14-conditional-and-sector-breadth.md`.
+`tools/backtest_conditional.py` deliberately exposes **no** aggregate
+cross-cohort spread at all; pairing is the only cross-cohort route it offers.
 
 ### Tests
 
