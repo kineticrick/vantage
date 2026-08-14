@@ -79,8 +79,10 @@ claims:
       dates. Ranking sectors by median trajectory score instead gave +0.23,
       -0.35 and +0.01, winning 53, 47 and 51.
     implication: >
-      Sector breadth is descriptive dispersion, not a theme predictor. Do not
-      use it to order or select brief items.
+      Sector breadth is descriptive dispersion, not a theme predictor. That is
+      the evidence; this is policy built on it: displaying it descriptively
+      (e.g. "N of M names accelerating") is fine, but predictive framing and
+      any role in ordering or selecting brief items is not.
     finding: docs/superpowers/findings/2026-08-14-conditional-and-sector-breadth.md
 
   - id: 12m-rank-beats-universe
@@ -93,8 +95,10 @@ claims:
       The 12-month leader cohort beat the plain universe by +1.43, +4.62 and
       +9.01 percentage points paired, winning 59, 71 and 69 of 102 dates; an
       independent top-30 construction replicated it at +1.55, +2.92 and +6.10,
-      winning 65, 65 and 73. This is the only comparison of 66 across both
-      studies that clears its band.
+      winning 65, 65 and 73. Of 66 test cells reported across both studies,
+      exactly 3 clear their significance band, and all three belong to this
+      one comparison — ranking by trailing 12-month return against the
+      universe.
     implication: >
       The existing 12-month screen is the one validated component of this
       system. Do not displace it. Note the caveat: both backtests rank by
