@@ -219,9 +219,9 @@ headline (§1):
 
 | Horizon | Median diff | Mean diff | Std dev (dispersion) | Hit rate (accel < leaders) |
 |---|---|---|---|---|
-| 21d | -1.21pp | -0.92pp | 7.5pp | 60 / 102 |
+| 21d | -1.21pp | -0.92pp | 7.5pp | 60 / 102 (0 ties) |
 | 63d | -1.41pp | -3.30pp | 14.5pp | 56 / 102 (+2 exact ties) |
-| 126d | -5.31pp | -5.35pp | 23.7pp | 64 / 102 |
+| 126d | -5.31pp | -5.35pp | 23.7pp | 64 / 102 (0 ties) |
 
 Reading these together: **accelerating-vs-universe and fading-vs-universe
 are both statistically indistinguishable from noise.** Hit rates sit at

@@ -36,8 +36,8 @@ _ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools"))
 
-from backtest_momentum import (formation_positions, forward_return,  # noqa: E402
-                               metrics_at, paired_stats)
+from backtest_core import (formation_positions, forward_return,  # noqa: E402
+                           metrics_at, paired_stats)
 from vantage.momentum import (MomentumParams, classify, drawdown_from_high,  # noqa: E402
                               realized_volatility, sector_breadth)
 
