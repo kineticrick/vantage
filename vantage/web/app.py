@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from vantage.settings import load_settings
 from vantage.conversation import Conversation
 from vantage.web import artifacts as art
+from vantage import chatstore, chattitle
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -21,6 +22,46 @@ def _sse(events):
     for ev in events:
         yield f"data: {json.dumps(ev)}\n\n"
 
+def _persist(conv, session, settings):
+    """Save the turn, then best-effort re-title.
+
+    Titling runs after the save so a titling problem can never cost a
+    conversation, and it is best-effort inside maybe_retitle, which swallows
+    its own failures. The second save only happens when the title changed.
+    """
+    session.messages = chatstore.normalize(conv.messages)
+    d = chatstore.chats_dir(settings)
+    chatstore.save(d, session)
+    if chattitle.maybe_retitle(session, settings):
+        chatstore.save(d, session)
+
+
+def _chat_events(conv, session, settings, message):
+    """Forward the conversation's events, persisting the completed turn.
+
+    The save is attempted just before "done" so a failure can be reported as
+    an event the client is still listening for. The finally covers the other
+    path — a client that walks away mid-answer — where yielding is no longer
+    legal, so that failure can only be swallowed.
+    """
+    saved = False
+    try:
+        for ev in conv.send(message):
+            if ev.get("type") == "done" and not saved:
+                saved = True
+                try:
+                    _persist(conv, session, settings)
+                except Exception as e:
+                    yield {"type": "error", "message": f"chat not saved: {e}"}
+            yield ev
+    finally:
+        if not saved:
+            try:
+                _persist(conv, session, settings)
+            except Exception:
+                pass
+
+
 def create_app(settings=None, conversation_factory=None,
                refresh_runner=None, portfolio_loader=None) -> FastAPI:
     app = FastAPI()
@@ -31,6 +72,7 @@ def create_app(settings=None, conversation_factory=None,
     from vantage.web.pipeline import run_refresh
     app.state.refresh_runner = refresh_runner or run_refresh
     app.state.conversation = None
+    app.state.session = None
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -93,12 +135,17 @@ def create_app(settings=None, conversation_factory=None,
     async def chat(request: Request):
         body = await request.json()
         conv = _get_conversation()
-        return StreamingResponse(_sse(conv.send(body.get("message", ""))),
-                                 media_type="text/event-stream")
+        if app.state.session is None:
+            app.state.session = chatstore.new_session()
+        return StreamingResponse(
+            _sse(_chat_events(conv, app.state.session, app.state.settings,
+                              body.get("message", ""))),
+            media_type="text/event-stream")
 
     @app.post("/api/chat/new")
     def chat_new():
         app.state.conversation = None
+        app.state.session = None
         return {"ok": True}
 
     @app.post("/api/refresh")
