@@ -110,3 +110,40 @@ def test_resume_rebuilds_context_rather_than_reusing_a_stale_conversation(tmp_pa
     before = len(convs)
     client.post("/api/chats/20260815T100000Z/resume")
     assert len(convs) == before + 1
+
+
+def test_get_chat_rejects_malformed_id_without_slash(tmp_path):
+    # No "/" here, so the request reaches chat_one and chatstore.load itself
+    # (unlike the %2F traversal case, which Starlette's router rejects before
+    # the handler is ever called) — this is the defense chatstore.load's
+    # ID_RE actually owns. A real file is seeded at this exact (malformed)
+    # id's path so the 404 can only come from ID_RE rejecting the id before
+    # the file-existence check runs — not from the file simply not existing.
+    client = _client(tmp_path)
+    _seed(tmp_path, "not-a-valid-id", "should never load",
+          [{"role": "user", "content": "x"}])
+    r = client.get("/api/chats/not-a-valid-id")
+    assert r.status_code == 404
+    assert r.json() == {"error": "not found"}
+
+
+def test_resume_rejects_malformed_id_without_slash(tmp_path):
+    client = _client(tmp_path)
+    _seed(tmp_path, "not-a-valid-id", "should never load",
+          [{"role": "user", "content": "x"}])
+    r = client.post("/api/chats/not-a-valid-id/resume")
+    assert r.status_code == 404
+    assert r.json() == {"error": "not found"}
+
+
+def test_get_chat_rejects_trailing_newline_id(tmp_path):
+    # This is the exact case ID_RE's \Z anchor exists for: "$" would match
+    # just before a trailing newline, but "\Z" only matches end-of-string.
+    # The file is seeded under the literal (newline-suffixed) id so a regex
+    # that let this through would actually find and return it.
+    client = _client(tmp_path)
+    _seed(tmp_path, "20260815T100000Z\n", "should never load",
+          [{"role": "user", "content": "x"}])
+    r = client.get("/api/chats/20260815T100000Z%0A")
+    assert r.status_code == 404
+    assert r.json() == {"error": "not found"}
