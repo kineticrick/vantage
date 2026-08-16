@@ -125,7 +125,19 @@ def test_titling_failure_never_breaks_a_turn(tmp_path, monkeypatch):
 
 
 def test_abandoning_the_stream_still_persists_the_turn(tmp_path):
-    """Closing the tab mid-answer must not lose the exchange."""
+    """End-to-end evidence that a turn reaches disk when the client walks
+    away mid-answer.
+
+    This does NOT prove the finally-block fallback in _chat_events runs:
+    Starlette's TestClient drives the underlying sync generator to
+    completion in a background thread regardless of whether the client
+    keeps reading (StreamingResponse wraps a sync generator with
+    iterate_in_threadpool, which is not preemptible from the client side).
+    So this test's save happens via the normal "done"-branch path even
+    though the client only reads one line. See
+    test_generator_close_exercises_the_finally_persist_path below for a
+    test that genuinely exercises the finally path via GeneratorExit.
+    """
     app, conv = _app(tmp_path, conv=_AbandonedConversation())
     client = TestClient(app)
     with client.stream("POST", "/api/chat", json={"message": "hello"}) as r:
@@ -135,4 +147,34 @@ def test_abandoning_the_stream_still_persists_the_turn(tmp_path):
     rows = chatstore.list_sessions(tmp_path / "reports" / "chats")
     assert len(rows) == 1
     sess = chatstore.load(tmp_path / "reports" / "chats", rows[0]["id"])
+    assert sess.messages[0] == {"role": "user", "content": "hello"}
+
+
+def test_generator_close_exercises_the_finally_persist_path(tmp_path):
+    """Directly exercises the finally-block fallback in _chat_events.
+
+    Unlike test_abandoning_the_stream_still_persists_the_turn (which goes
+    through Starlette's TestClient and, as its docstring explains, doesn't
+    actually cut the generator off), this drives _chat_events itself: pull
+    one event with next(), then call .close() on the generator. close()
+    raises GeneratorExit at the generator's current suspension point (the
+    "yield ev" line), which is exactly what happens when a real client's
+    disconnect causes the generator object to be torn down before "done"
+    is reached. saved is still False at that point, so this is the only
+    test that actually forces the finally branch's own _persist call to
+    run — proved by disabling it: with the finally-block save removed,
+    this test fails (no session file); with it restored, it passes.
+    """
+    from vantage.web.app import _chat_events
+    settings = _settings(tmp_path)
+    session = chatstore.new_session()
+    conv = _AbandonedConversation()
+
+    gen = _chat_events(conv, session, settings, "hello")
+    next(gen)            # pull exactly one event ("text": "partial")
+    gen.close()           # -> GeneratorExit inside _chat_events -> finally runs
+
+    rows = chatstore.list_sessions(chatstore.chats_dir(settings))
+    assert len(rows) == 1
+    sess = chatstore.load(chatstore.chats_dir(settings), rows[0]["id"])
     assert sess.messages[0] == {"role": "user", "content": "hello"}

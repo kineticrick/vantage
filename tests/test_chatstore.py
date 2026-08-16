@@ -60,6 +60,12 @@ def test_save_and_load_round_trip(tmp_path):
     assert back.updated_at == "2026-08-15T20:00:00Z"
 
 
+def test_new_session_ids_do_not_collide_back_to_back():
+    a = chatstore.new_session()
+    b = chatstore.new_session()
+    assert a.id != b.id
+
+
 def test_save_creates_the_chats_directory(tmp_path):
     target = tmp_path / "chats"
     assert not target.exists()

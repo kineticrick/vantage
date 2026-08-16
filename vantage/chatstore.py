@@ -13,8 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Conversation ids are UTC stamps. They land in a filename, so anything that
-# does not match is refused rather than joined onto a path.
-ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z\Z")
+# does not match is refused rather than joined onto a path. The microsecond
+# group is optional: ids minted by _stamp_id() always carry it (so two
+# sessions created in the same second still get distinct filenames), but
+# hand-written 14-digit ids (e.g. in tests, or resume links seeded before
+# this change) must keep resolving.
+ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}(?:[0-9]{6})?Z\Z")
 
 _TOOL_RESULT_CAP = 200
 
@@ -44,7 +48,9 @@ def _utc_now() -> str:
 
 
 def _stamp_id() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    # Microseconds keep two sessions minted in the same second from
+    # colliding on one filename and silently overwriting each other.
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
 def chats_dir(settings) -> Path:

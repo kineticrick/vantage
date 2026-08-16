@@ -65,7 +65,9 @@ through it.
 
 ```
 ChatSession:
-    id           "20260815T195412Z"   sortable, unique, matches chat.py's stamp
+    id           "20260815T195412123456Z"   sortable, unique, matches chat.py's
+                 stamp (microseconds included so two sessions minted in the
+                 same second still get distinct ids)
     started_at   ISO-8601 UTC
     updated_at   ISO-8601 UTC
     title        auto-generated; "" until the first titling call succeeds
