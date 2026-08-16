@@ -14,7 +14,7 @@ from pathlib import Path
 
 # Conversation ids are UTC stamps. They land in a filename, so anything that
 # does not match is refused rather than joined onto a path.
-ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z$")
+ID_RE = re.compile(r"^[0-9]{8}T[0-9]{6}Z\Z")
 
 _TOOL_RESULT_CAP = 200
 

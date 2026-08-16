@@ -169,3 +169,7 @@ def test_id_re_rejects_path_traversal():
     assert chatstore.ID_RE.match("20260815T195412Z")
     assert not chatstore.ID_RE.match("../../etc/passwd")
     assert not chatstore.ID_RE.match("20260815T195412Z/../x")
+    assert not chatstore.ID_RE.match("20260815T195412Z\n")
+    assert not chatstore.ID_RE.match("/etc/passwd")
+    assert not chatstore.ID_RE.match("")
+    assert not chatstore.ID_RE.match("20260815T195412Zsuffix")
