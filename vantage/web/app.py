@@ -22,20 +22,6 @@ def _sse(events):
     for ev in events:
         yield f"data: {json.dumps(ev)}\n\n"
 
-def _persist(conv, session, settings):
-    """Save the turn, then best-effort re-title.
-
-    Titling runs after the save so a titling problem can never cost a
-    conversation, and it is best-effort inside maybe_retitle, which swallows
-    its own failures. The second save only happens when the title changed.
-    """
-    session.messages = chatstore.normalize(conv.messages)
-    d = chatstore.chats_dir(settings)
-    chatstore.save(d, session)
-    if chattitle.maybe_retitle(session, settings):
-        chatstore.save(d, session)
-
-
 def _chat_events(conv, session, settings, message):
     """Forward the conversation's events, persisting the completed turn.
 
@@ -50,14 +36,14 @@ def _chat_events(conv, session, settings, message):
             if ev.get("type") == "done" and not saved:
                 saved = True
                 try:
-                    _persist(conv, session, settings)
+                    chatstore.persist(conv.messages, session, settings)
                 except Exception as e:
                     yield {"type": "error", "message": f"chat not saved: {e}"}
             yield ev
     finally:
         if not saved:
             try:
-                _persist(conv, session, settings)
+                chatstore.persist(conv.messages, session, settings)
             except Exception:
                 pass
 
@@ -172,7 +158,12 @@ def create_app(settings=None, conversation_factory=None,
         # A resumed chat therefore carries last week's discussion against this
         # week's data — the grounding stays current even when the history is not.
         conv = app.state.conversation_factory(app.state.settings)
-        conv.messages = list(sess.messages)
+        # The .md transcript and the read-only viewer keep the full, possibly
+        # partial turn; only the replay handed to the API is repaired here —
+        # a dangling tool_use or unanswered user turn (left behind when a
+        # client abandons a stream mid-turn) is invalid as API input and
+        # would poison every future turn once the API starts rejecting it.
+        conv.messages = chatstore.resumable(sess.messages)
         app.state.conversation = conv
         app.state.session = sess
         return {"ok": True, "id": sess.id,

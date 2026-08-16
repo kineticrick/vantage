@@ -289,10 +289,16 @@ function addMsg(kind, text) {
 $("chat-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $("chat-input");
+  const submitBtn = $("chat-form").querySelector('button[type="submit"]');
   const msg = input.value.trim();
   if (!msg) return;
   addMsg("user", msg);
   input.value = "";
+  // Guard against concurrent turns on the one shared session: two in-flight
+  // streams would interleave appends into the same server-side conversation
+  // and both persist over each other. Mirrors the refresh button's guard.
+  input.disabled = true;
+  submitBtn.disabled = true;
   // A reply interleaves text with tool calls, so it can own several bubbles.
   // Keep every one: `bubble` is only the open (still-appending) one, while
   // `bubbles` accumulates them all for annotation once the stream is done.
@@ -316,12 +322,29 @@ $("chat-form").addEventListener("submit", async (e) => {
     for (const b of bubbles) b.replaceChildren(annotate(b.textContent));
   } catch (e) {
     addMsg("error", "[error: " + e + "]");
+  } finally {
+    input.disabled = false;
+    submitBtn.disabled = false;
+    input.focus();
   }
 });
+
+// Read-only viewing state: openChat() shows a past conversation without
+// changing which session is actually live, so the composer must not look
+// like it will continue that conversation — the next message would in fact
+// go to whichever session IS active, against context the panel isn't
+// showing. setViewingPast(false) is the "back to live" state: composer
+// enabled, banner hidden.
+function setViewingPast(viewing) {
+  $("chat-input").disabled = viewing;
+  $("chat-form").querySelector('button[type="submit"]').disabled = viewing;
+  $("chat-viewing-banner").hidden = !viewing;
+}
 
 $("chat-new").addEventListener("click", async () => {
   await fetch("/api/chat/new", { method: "POST" });
   $("chat-log").innerHTML = "";
+  setViewingPast(false);
   loadChatHistory();
 });
 
@@ -391,6 +414,9 @@ async function openChat(id) {
   // Same treatment a live reply gets once its stream ends (app.js:316), so a
   // reopened conversation shows names and sectors like a fresh one.
   for (const b of bubbles) b.replaceChildren(annotate(b.textContent));
+  // Read-only by design: no server state changed, so the composer must not
+  // suggest that typing here continues this conversation.
+  setViewingPast(true);
 }
 
 async function resumeChat(id) {
@@ -398,6 +424,9 @@ async function resumeChat(id) {
                         { method: "POST" });
   if (!r.ok) return;
   await openChat(id);
+  // openChat() just disabled the composer for read-only viewing; resuming
+  // makes this conversation the live one again, so re-enable it.
+  setViewingPast(false);
 }
 
 $("chat-history-toggle").addEventListener("click", () => {

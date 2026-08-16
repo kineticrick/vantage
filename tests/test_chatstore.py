@@ -171,6 +171,147 @@ def test_render_markdown_annotates_tool_calls(tmp_path):
     assert "MU is up 683% over 12m." in md
 
 
+def test_resumable_drops_a_trailing_unanswered_tool_use():
+    messages = [
+        {"role": "user", "content": "what about MU?"},
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "let me check"},
+            {"type": "tool_use", "id": "t1", "name": "get_ticker_metrics",
+             "input": {"ticker": "MU"}}]},
+    ]
+    out = chatstore.resumable(messages)
+    # the whole broken turn goes: the assistant reply was never validly
+    # answered, so the user question it responds to is dangling too
+    assert out == []
+    for m in out:
+        content = m.get("content")
+        blocks = content if isinstance(content, list) else []
+        assert not any(b.get("type") == "tool_use" for b in blocks)
+
+
+def test_resumable_drops_a_trailing_bare_user_turn():
+    messages = [
+        {"role": "user", "content": "what about MU?"},
+        {"role": "assistant", "content": [{"type": "text", "text": "MU is up."}]},
+        {"role": "user", "content": "and NVDA?"},
+    ]
+    out = chatstore.resumable(messages)
+    assert out == [
+        {"role": "user", "content": "what about MU?"},
+        {"role": "assistant", "content": [{"type": "text", "text": "MU is up."}]},
+    ]
+
+
+def test_resumable_drops_a_dangling_tool_result_with_no_reply():
+    messages = [
+        {"role": "user", "content": "what about MU?"},
+        {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "t1", "name": "get_ticker_metrics",
+             "input": {"ticker": "MU"}}]},
+        {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "t1", "content": "{}"}]},
+    ]
+    out = chatstore.resumable(messages)
+    assert out == []
+
+
+def test_resumable_leaves_a_balanced_conversation_untouched():
+    messages = [
+        {"role": "user", "content": "what about MU?"},
+        {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "t1", "name": "get_ticker_metrics",
+             "input": {"ticker": "MU"}}]},
+        {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "t1", "content": "{}"}]},
+        {"role": "assistant", "content": [
+            {"type": "text", "text": "MU is up 683% over 12m."}]},
+    ]
+    assert chatstore.resumable(messages) == messages
+
+
+def test_resumable_leaves_a_plain_text_only_conversation_untouched():
+    messages = [
+        {"role": "user", "content": "hello"},
+        {"role": "assistant", "content": [{"type": "text", "text": "hi there"}]},
+    ]
+    assert chatstore.resumable(messages) == messages
+
+
+def test_resumable_of_empty_history_is_empty():
+    assert chatstore.resumable([]) == []
+
+
+def test_thinking_block_normalizes_with_signature_intact():
+    class _ThinkingBlock:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def model_dump(self, mode=None, exclude_none=False):
+            return dict(self._payload)
+
+    messages = [
+        {"role": "user", "content": "what about MU?"},
+        {"role": "assistant", "content": [
+            _ThinkingBlock({"type": "thinking", "thinking": "weighing the evidence...",
+                            "signature": "sig-abc123"}),
+            _ThinkingBlock({"type": "text", "text": "MU looks strong."})]},
+    ]
+    out = chatstore.normalize(messages)
+    thinking_block = out[1]["content"][0]
+    assert thinking_block == {"type": "thinking", "thinking": "weighing the evidence...",
+                              "signature": "sig-abc123"}
+    json.dumps(out)  # must be JSON-serializable
+
+    s = chatstore.ChatSession(id="20260815T100000Z", started_at="2026-08-15T10:00:00Z",
+                              updated_at="2026-08-15T10:00:00Z", messages=out)
+    md = chatstore.render_markdown(s)
+    assert "weighing the evidence" not in md
+    assert "sig-abc123" not in md
+    assert "MU looks strong." in md
+
+
+def test_persist_normalizes_saves_and_retitles(tmp_path, monkeypatch):
+    class S:
+        anthropic_api_key = "k"
+        model = "m"
+        reports_dir = tmp_path / "reports"
+
+    def fake_retitle(session, settings, _client=None):
+        session.title = "a generated title"
+        session.title_turns = 1
+        return True
+    monkeypatch.setattr("vantage.chattitle.maybe_retitle", fake_retitle)
+
+    settings = S()
+    session = chatstore.new_session()
+    chatstore.persist([{"role": "user", "content": "hello"}], session, settings)
+
+    back = chatstore.load(chatstore.chats_dir(settings), session.id)
+    assert back.messages == [{"role": "user", "content": "hello"}]
+    assert back.title == "a generated title"  # the re-save after retitling landed
+
+
+def test_persist_does_not_resave_when_title_is_unchanged(tmp_path, monkeypatch):
+    class S:
+        anthropic_api_key = "k"
+        model = "m"
+        reports_dir = tmp_path / "reports"
+
+    monkeypatch.setattr("vantage.chattitle.maybe_retitle", lambda *a, **k: False)
+    saves = []
+    real_save = chatstore.save
+
+    def counting_save(*a, **k):
+        saves.append(1)
+        return real_save(*a, **k)
+    monkeypatch.setattr(chatstore, "save", counting_save)
+
+    settings = S()
+    session = chatstore.new_session()
+    chatstore.persist([{"role": "user", "content": "hi"}], session, settings)
+    assert len(saves) == 1  # no re-save: the title never changed
+
+
 def test_id_re_rejects_path_traversal():
     assert chatstore.ID_RE.match("20260815T195412Z")
     assert not chatstore.ID_RE.match("../../etc/passwd")

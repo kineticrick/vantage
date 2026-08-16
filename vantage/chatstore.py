@@ -90,6 +90,29 @@ def normalize(messages) -> list:
     return out
 
 
+def resumable(messages) -> list:
+    """Longest prefix that is valid as API input.
+
+    Drops a trailing user turn with no assistant reply, and a trailing
+    assistant turn whose tool_use blocks were never answered — both are
+    produced when a client abandons a stream mid-turn (web/app.py's finally).
+    """
+    out = list(messages)
+    while out:
+        last = out[-1]
+        content = last.get("content")
+        blocks = content if isinstance(content, list) else []
+        if last.get("role") == "assistant" and any(
+                b.get("type") == "tool_use" for b in blocks):
+            out.pop()          # unanswered tool_use
+            continue
+        if last.get("role") == "user":
+            out.pop()          # unanswered user turn (incl. dangling tool_results)
+            continue
+        break
+    return out
+
+
 def turn_count(messages) -> int:
     """User-initiated exchanges — NOT len(messages).
 
@@ -105,6 +128,8 @@ def _atomic_write(path: Path, text: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -121,6 +146,23 @@ def save(chats_directory, session: ChatSession, now=None) -> None:
     _atomic_write(d / f"chat-{session.id}.json",
                   json.dumps(session.to_dict(), indent=2))
     _atomic_write(d / f"chat-{session.id}.md", render_markdown(session))
+
+
+def persist(conv_messages, session: ChatSession, settings) -> None:
+    """Save the turn, then best-effort re-title.
+
+    Titling runs after the save so a titling problem can never cost a
+    conversation, and it is best-effort inside maybe_retitle, which swallows
+    its own failures. The second save only happens when the title changed.
+    Shared by chat.py and web/app.py so the save -> retitle -> conditional
+    re-save sequencing lives in exactly one place.
+    """
+    from vantage import chattitle  # deferred: chattitle already imports chatstore
+    session.messages = normalize(conv_messages)
+    d = chats_dir(settings)
+    save(d, session)
+    if chattitle.maybe_retitle(session, settings):
+        save(d, session)
 
 
 def load(chats_directory, session_id: str) -> ChatSession | None:
@@ -150,7 +192,7 @@ def list_sessions(chats_directory) -> list:
                      "started_at": started,
                      "updated_at": d.get("updated_at", ""),
                      "turns": turn_count(d.get("messages", []))})
-    rows.sort(key=lambda r: r["updated_at"], reverse=True)
+    rows.sort(key=lambda r: (r["updated_at"], r["id"]), reverse=True)
     return rows
 
 

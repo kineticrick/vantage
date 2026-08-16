@@ -95,6 +95,48 @@ def test_resume_loads_history_into_the_active_conversation(tmp_path):
     assert rows[0]["turns"] == 2
 
 
+def test_resume_repairs_a_dangling_tool_use_before_replay(tmp_path):
+    """The stored transcript can end mid-turn (an abandoned stream persists
+    it via web/app.py's finally). Resuming it must hand the API a valid
+    prefix, or the very next send() gets rejected and that rejection is
+    itself persisted, permanently bricking the conversation."""
+    convs = []
+    client = _client(tmp_path, convs=convs)
+    _seed(tmp_path, "20260815T100000Z", "optical names",
+          [{"role": "user", "content": "what about MU?"},
+           {"role": "assistant", "content": [
+               {"type": "tool_use", "id": "t1", "name": "get_ticker_metrics",
+                "input": {"ticker": "MU"}}]}])
+
+    assert client.post("/api/chats/20260815T100000Z/resume").status_code == 200
+    client.post("/api/chat", json={"message": "follow-up"})
+
+    for m in convs[-1].messages:
+        content = m.get("content")
+        blocks = content if isinstance(content, list) else []
+        assert not any(b.get("type") == "tool_use" for b in blocks
+                       if isinstance(b, dict))
+
+
+def test_resume_repairs_a_trailing_bare_user_turn_before_replay(tmp_path):
+    convs = []
+    client = _client(tmp_path, convs=convs)
+    _seed(tmp_path, "20260815T100000Z", "optical names",
+          [{"role": "user", "content": "what about MU?"},
+           {"role": "assistant", "content": [{"type": "text", "text": "MU is up."}]},
+           {"role": "user", "content": "and NVDA?"}])
+
+    assert client.post("/api/chats/20260815T100000Z/resume").status_code == 200
+    client.post("/api/chat", json={"message": "follow-up"})
+
+    # the dangling "and NVDA?" was dropped by resumable(); the conversation
+    # handed to the factory starts with the balanced first turn, then the
+    # NEW follow-up sent just now — never two consecutive user turns.
+    roles = [m["role"] for m in convs[-1].messages]
+    assert not any(a == "user" and b == "user"
+                   for a, b in zip(roles, roles[1:]))
+
+
 def test_resume_unknown_id_is_404(tmp_path):
     assert _client(tmp_path).post(
         "/api/chats/20260101T000000Z/resume").status_code == 404
