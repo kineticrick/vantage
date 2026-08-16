@@ -323,9 +323,18 @@ $("chat-form").addEventListener("submit", async (e) => {
   } catch (e) {
     addMsg("error", "[error: " + e + "]");
   } finally {
-    input.disabled = false;
-    submitBtn.disabled = false;
-    input.focus();
+    // Re-derive the enabled state instead of unconditionally enabling:
+    // openChat() may have switched the panel to a read-only past conversation
+    // while this stream was still in flight, and that state has to win. The
+    // banner is the single source of truth setViewingPast() maintains.
+    // Otherwise the composer goes live underneath a "Viewing a past
+    // conversation" banner and the next message silently goes to a different
+    // session than the one on screen — the exact hazard that banner exists
+    // to prevent.
+    const viewing = !$("chat-viewing-banner").hidden;
+    input.disabled = viewing;
+    submitBtn.disabled = viewing;
+    if (!viewing) input.focus();
   }
 });
 
