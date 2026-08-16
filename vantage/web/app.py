@@ -148,6 +148,36 @@ def create_app(settings=None, conversation_factory=None,
         app.state.session = None
         return {"ok": True}
 
+    @app.get("/api/chats")
+    def chats():
+        return chatstore.list_sessions(chatstore.chats_dir(app.state.settings))
+
+    @app.get("/api/chats/{cid}")
+    def chat_one(cid: str):
+        sess = chatstore.load(chatstore.chats_dir(app.state.settings), cid)
+        if sess is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return {"id": sess.id, "title": sess.title,
+                "started_at": sess.started_at, "updated_at": sess.updated_at,
+                "turns": chatstore.turn_count(sess.messages),
+                "messages": sess.messages}
+
+    @app.post("/api/chats/{cid}/resume")
+    def chat_resume(cid: str):
+        sess = chatstore.load(chatstore.chats_dir(app.state.settings), cid)
+        if sess is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        # Built fresh on purpose: Conversation composes its system prompt from
+        # today's brief, portfolio and evidence register (conversation.py:20-21).
+        # A resumed chat therefore carries last week's discussion against this
+        # week's data — the grounding stays current even when the history is not.
+        conv = app.state.conversation_factory(app.state.settings)
+        conv.messages = list(sess.messages)
+        app.state.conversation = conv
+        app.state.session = sess
+        return {"ok": True, "id": sess.id,
+                "turns": chatstore.turn_count(sess.messages)}
+
     @app.post("/api/refresh")
     def refresh():
         return StreamingResponse(_sse(app.state.refresh_runner(app.state.settings)),
