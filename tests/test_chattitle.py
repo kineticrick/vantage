@@ -3,9 +3,10 @@ from vantage import chatstore, chattitle
 
 
 class _FakeMessages:
-    def __init__(self, text=None, error=None):
+    def __init__(self, text=None, error=None, block_type="text"):
         self._text = text
         self._error = error
+        self._block_type = block_type
         self.calls = []
 
     def create(self, **kwargs):
@@ -13,9 +14,12 @@ class _FakeMessages:
         if self._error is not None:
             raise self._error
 
+        block_type = self._block_type
+        block_text = self._text
+
         class _Block:
-            type = "text"
-            text = self._text
+            type = block_type
+            text = block_text
 
         class _Resp:
             content = [_Block()]
@@ -24,8 +28,9 @@ class _FakeMessages:
 
 
 class _FakeClient:
-    def __init__(self, text=None, error=None):
-        self.messages = _FakeMessages(text=text, error=error)
+    def __init__(self, text=None, error=None, block_type="text"):
+        self.messages = _FakeMessages(text=text, error=error,
+                                       block_type=block_type)
 
 
 def _settings():
@@ -117,6 +122,47 @@ def test_maybe_retitle_never_writes_a_placeholder_title():
     chattitle.maybe_retitle(s, _settings(),
                             _client=_FakeClient(error=RuntimeError("down")))
     assert s.title == ""
+
+
+def test_generate_title_takes_first_non_empty_line():
+    client = _FakeClient(text="Good title\n\nlong rambling justification")
+    out = chattitle.generate_title([{"role": "user", "content": "x"}],
+                                   _settings(), _client=client)
+    assert out == "Good title"
+
+
+def test_generate_title_caps_length_at_80_chars():
+    client = _FakeClient(text="A" * 5000)
+    out = chattitle.generate_title([{"role": "user", "content": "x"}],
+                                   _settings(), _client=client)
+    assert len(out) == 80
+    assert out == "A" * 80
+
+
+def test_generate_title_returns_empty_for_whitespace_only_response():
+    client = _FakeClient(text="   \n\t  \n")
+    out = chattitle.generate_title([{"role": "user", "content": "x"}],
+                                   _settings(), _client=client)
+    assert out == ""
+
+
+def test_generate_title_returns_empty_when_no_text_block():
+    client = _FakeClient(text="ignored", block_type="tool_use")
+    out = chattitle.generate_title([{"role": "user", "content": "x"}],
+                                   _settings(), _client=client)
+    assert out == ""
+
+
+def test_maybe_retitle_rejects_blank_title_without_advancing():
+    s = chatstore.new_session(now="2026-08-15T10:00:00Z")
+    s.title = "existing"
+    s.title_turns = 0
+    s.messages = [{"role": "user", "content": "a"}]
+    changed = chattitle.maybe_retitle(
+        s, _settings(), _client=_FakeClient(text="   \n  "))
+    assert changed is False
+    assert s.title == "existing"
+    assert s.title_turns == 0
 
 
 def test_maybe_retitle_is_a_noop_between_thresholds():

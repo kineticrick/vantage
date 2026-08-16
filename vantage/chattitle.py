@@ -48,6 +48,9 @@ def _transcript(messages) -> str:
     return "\n".join(lines)[:_PROMPT_CAP]
 
 
+_TITLE_CAP = 80
+
+
 def generate_title(messages, settings, _client=None) -> str:
     client = _client
     if client is None:
@@ -59,7 +62,13 @@ def generate_title(messages, settings, _client=None) -> str:
                    "content": _INSTRUCTION + _transcript(messages)}])
     text = "".join(getattr(b, "text", "") for b in resp.content
                    if getattr(b, "type", None) == "text")
-    return text.strip().strip('"').strip()
+    # max_tokens=32 is a property of the request, not an invariant of this
+    # function — a model change, a client swap, or a response shaped
+    # "Title\n\nhere's why I chose it" could otherwise hand back something
+    # that wrecks the scannable list this feature exists to build. Take the
+    # first non-empty line only, then cap defensively.
+    line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
+    return line.strip('"').strip()[:_TITLE_CAP]
 
 
 def maybe_retitle(session, settings, _client=None) -> bool:
@@ -70,10 +79,10 @@ def maybe_retitle(session, settings, _client=None) -> bool:
     empty title means never successfully titled, and list_sessions supplies
     the display fallback.
     """
-    turns = chatstore.turn_count(session.messages)
-    if not should_title(turns, session.title_turns):
-        return False
     try:
+        turns = chatstore.turn_count(session.messages)
+        if not should_title(turns, session.title_turns):
+            return False
         title = generate_title(session.messages, settings, _client=_client)
     except Exception:
         return False
