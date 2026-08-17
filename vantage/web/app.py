@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from vantage.settings import load_settings
 from vantage.conversation import Conversation
 from vantage.web import artifacts as art
+from vantage import chatstore, chattitle
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -21,6 +22,32 @@ def _sse(events):
     for ev in events:
         yield f"data: {json.dumps(ev)}\n\n"
 
+def _chat_events(conv, session, settings, message):
+    """Forward the conversation's events, persisting the completed turn.
+
+    The save is attempted just before "done" so a failure can be reported as
+    an event the client is still listening for. The finally covers the other
+    path — a client that walks away mid-answer — where yielding is no longer
+    legal, so that failure can only be swallowed.
+    """
+    saved = False
+    try:
+        for ev in conv.send(message):
+            if ev.get("type") == "done" and not saved:
+                saved = True
+                try:
+                    chatstore.persist(conv.messages, session, settings)
+                except Exception as e:
+                    yield {"type": "error", "message": f"chat not saved: {e}"}
+            yield ev
+    finally:
+        if not saved:
+            try:
+                chatstore.persist(conv.messages, session, settings)
+            except Exception:
+                pass
+
+
 def create_app(settings=None, conversation_factory=None,
                refresh_runner=None, portfolio_loader=None) -> FastAPI:
     app = FastAPI()
@@ -31,6 +58,7 @@ def create_app(settings=None, conversation_factory=None,
     from vantage.web.pipeline import run_refresh
     app.state.refresh_runner = refresh_runner or run_refresh
     app.state.conversation = None
+    app.state.session = None
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -93,13 +121,53 @@ def create_app(settings=None, conversation_factory=None,
     async def chat(request: Request):
         body = await request.json()
         conv = _get_conversation()
-        return StreamingResponse(_sse(conv.send(body.get("message", ""))),
-                                 media_type="text/event-stream")
+        if app.state.session is None:
+            app.state.session = chatstore.new_session()
+        return StreamingResponse(
+            _sse(_chat_events(conv, app.state.session, app.state.settings,
+                              body.get("message", ""))),
+            media_type="text/event-stream")
 
     @app.post("/api/chat/new")
     def chat_new():
         app.state.conversation = None
+        app.state.session = None
         return {"ok": True}
+
+    @app.get("/api/chats")
+    def chats():
+        return chatstore.list_sessions(chatstore.chats_dir(app.state.settings))
+
+    @app.get("/api/chats/{cid}")
+    def chat_one(cid: str):
+        sess = chatstore.load(chatstore.chats_dir(app.state.settings), cid)
+        if sess is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return {"id": sess.id, "title": sess.title,
+                "started_at": sess.started_at, "updated_at": sess.updated_at,
+                "turns": chatstore.turn_count(sess.messages),
+                "messages": sess.messages}
+
+    @app.post("/api/chats/{cid}/resume")
+    def chat_resume(cid: str):
+        sess = chatstore.load(chatstore.chats_dir(app.state.settings), cid)
+        if sess is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        # Built fresh on purpose: Conversation composes its system prompt from
+        # today's brief, portfolio and evidence register (conversation.py:20-21).
+        # A resumed chat therefore carries last week's discussion against this
+        # week's data — the grounding stays current even when the history is not.
+        conv = app.state.conversation_factory(app.state.settings)
+        # The .md transcript and the read-only viewer keep the full, possibly
+        # partial turn; only the replay handed to the API is repaired here —
+        # a dangling tool_use or unanswered user turn (left behind when a
+        # client abandons a stream mid-turn) is invalid as API input and
+        # would poison every future turn once the API starts rejecting it.
+        conv.messages = chatstore.resumable(sess.messages)
+        app.state.conversation = conv
+        app.state.session = sess
+        return {"ok": True, "id": sess.id,
+                "turns": chatstore.turn_count(sess.messages)}
 
     @app.post("/api/refresh")
     def refresh():

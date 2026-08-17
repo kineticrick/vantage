@@ -13,8 +13,14 @@ def _settings(tmp_path):
                     cache_dir=tmp_path / "cache")
 
 class _FakeConversation:
+    def __init__(self):
+        self.messages = []
+
     def send(self, message):
+        self.messages.append({"role": "user", "content": message})
         yield {"type": "text", "text": f"echo: {message}"}
+        self.messages.append({"role": "assistant",
+                              "content": [{"type": "text", "text": f"echo: {message}"}]})
         yield {"type": "done"}
 
 def test_chat_streams_sse(tmp_path):

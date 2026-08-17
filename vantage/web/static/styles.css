@@ -31,6 +31,22 @@ button:hover { filter: brightness(1.08); }
 .chat-head { display: flex; justify-content: space-between; align-items: center;
              padding: 14px 16px; border-bottom: 1px solid var(--line);
              font-family: var(--serif); }
+#chat-history { border-bottom: 1px solid var(--line); }
+.chat-history-head { display: flex; justify-content: space-between; align-items: center;
+                      padding: 10px 16px; font-size: 13px; color: var(--muted); }
+.chat-history-head button { padding: 4px 10px; font-size: 12px; }
+#chat-history-list { list-style: none; margin: 0; padding: 0 16px 10px;
+                      max-height: 14rem; overflow-y: auto; }
+#chat-history-list li { display: flex; align-items: center; gap: 8px;
+                         padding: 6px 0; border-bottom: 1px solid var(--line); }
+#chat-history-list li:last-child { border-bottom: 0; }
+.chat-history-open { flex: 1; min-width: 0; background: none; color: var(--ink);
+                      font-weight: 400; text-align: left; padding: 4px 6px;
+                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-history-open:hover { background: rgba(140,123,181,.14); }
+.chat-history-meta { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); }
+.chat-history-continue { flex: 0 0 auto; padding: 4px 10px; font-size: 12px; }
+
 .chat-log { flex: 1; overflow-y: auto; padding: 16px; }
 .msg { margin-bottom: 14px; line-height: 1.5; white-space: pre-wrap; }
 .msg.user { color: var(--ink); }
@@ -42,6 +58,9 @@ button:hover { filter: brightness(1.08); }
 .chat-form textarea { flex: 1; resize: none; background: var(--bg);
   color: var(--ink); border: 1px solid var(--line); border-radius: 7px; padding: 8px;
   font-family: var(--sans); }
+.chat-form textarea:disabled, .chat-form button:disabled { opacity: .55; cursor: not-allowed; }
+.chat-viewing-banner { padding: 8px 16px; font-size: 12.5px; color: var(--muted);
+  font-style: italic; border-top: 1px solid var(--line); }
 
 /* --- Brief reading typography --- */
 /* Long-form prose: comfortable measure + leading so blocks read like text,

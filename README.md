@@ -93,8 +93,11 @@ the latest brief, then gives you an interactive prompt. Things to ask:
 
 When it fetches data mid-answer you'll see a note like
 `[looking up via get_ticker_metrics({'ticker': 'CEG'})]`. Exit with `exit`,
-`quit`, or Ctrl-D; each session is saved to `reports/chat-<timestamp>.md`. Each
-turn is a real (paid) Claude call, so expect a brief pause while it thinks.
+`quit`, or Ctrl-D. The conversation is saved to
+`reports/chats/chat-<id>.{json,md}` after every turn — not just at exit — so
+a Ctrl-C keeps everything already said. It's the same store the web dashboard
+writes to and lists, so a REPL session shows up there too. Each turn is a
+real (paid) Claude call, so expect a brief pause while it thinks.
 
 ### Web dashboard
 
@@ -128,8 +131,12 @@ an analyst chat docked on the right.
   screener → portfolio context) and reloads all panels on completion. This
   makes real market-data requests and takes a few minutes.
 - **Analyst chat** streams responses token-by-token using the same
-  conversational engine as `chat.py`. Requires `ANTHROPIC_API_KEY`. "New
-  conversation" starts a fresh session.
+  conversational engine as `chat.py`. Requires `ANTHROPIC_API_KEY`. Opening
+  the dashboard always starts a fresh chat; "New conversation" does the same
+  mid-session. Past conversations — from either the dashboard or the
+  `chat.py` REPL, since both save through the same store — are listed by
+  their auto-generated title, and any of them can be opened (read-only) or
+  resumed to keep talking with today's data.
 
 The server uses the same `WAKE_PATH` and portfolio settings as the CLI; if
 Wake is unreachable, Portfolio shows "Unavailable" and the other panels are
@@ -243,7 +250,7 @@ python -m pytest -q
 | Path | What |
 |---|---|
 | `reports/brief-<date>.{md,html,json}` | The weekly brief, three formats |
-| `reports/chat-<timestamp>.md` | A conversational-analyst transcript |
+| `reports/chats/chat-<id>.{json,md}` | A conversational-analyst session (structured + readable), written after every turn by `chat.py` and the dashboard alike |
 | `data/signals-<date>.json` | The deterministic screener output |
 | `cache/` | yfinance price cache + long-lived `sectors.json` |
 
@@ -265,9 +272,14 @@ reasoning, challenge). Units communicate through plain dataclasses.
 
 - Weekly pipeline: `data_ingest → screener → portfolio_context → analyst → report → deliver`
 - Conversational analyst: a web-ready `Conversation` engine (`vantage/conversation.py`)
-  whose `send()` yields an event stream, consumed by the `chat.py` terminal REPL;
-  it reuses the analyst persona (`vantage/persona.py`) and custom tools
-  (`vantage/chat_tools.py`) over the same deterministic units.
+  whose `send()` yields an event stream, consumed by both the `chat.py` terminal
+  REPL and the web dashboard; it reuses the analyst persona (`vantage/persona.py`)
+  and custom tools (`vantage/chat_tools.py`) over the same deterministic units.
+  Persistence is a separate concern: `vantage/chatstore.py` is the single owner
+  of saving, loading and listing chat sessions (`reports/chats/chat-<id>.{json,md}`),
+  and `vantage/chattitle.py` best-effort auto-titles a session as it grows —
+  both `chat.py` and the dashboard write through this store rather than each
+  building their own filename or format.
 
 Design specs:
 - `docs/superpowers/specs/2026-06-26-market-insights-blind-spot-radar-design.md`

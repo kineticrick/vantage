@@ -289,10 +289,16 @@ function addMsg(kind, text) {
 $("chat-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const input = $("chat-input");
+  const submitBtn = $("chat-form").querySelector('button[type="submit"]');
   const msg = input.value.trim();
   if (!msg) return;
   addMsg("user", msg);
   input.value = "";
+  // Guard against concurrent turns on the one shared session: two in-flight
+  // streams would interleave appends into the same server-side conversation
+  // and both persist over each other. Mirrors the refresh button's guard.
+  input.disabled = true;
+  submitBtn.disabled = true;
   // A reply interleaves text with tool calls, so it can own several bubbles.
   // Keep every one: `bubble` is only the open (still-appending) one, while
   // `bubbles` accumulates them all for annotation once the stream is done.
@@ -316,12 +322,126 @@ $("chat-form").addEventListener("submit", async (e) => {
     for (const b of bubbles) b.replaceChildren(annotate(b.textContent));
   } catch (e) {
     addMsg("error", "[error: " + e + "]");
+  } finally {
+    // Re-derive the enabled state instead of unconditionally enabling:
+    // openChat() may have switched the panel to a read-only past conversation
+    // while this stream was still in flight, and that state has to win. The
+    // banner is the single source of truth setViewingPast() maintains.
+    // Otherwise the composer goes live underneath a "Viewing a past
+    // conversation" banner and the next message silently goes to a different
+    // session than the one on screen — the exact hazard that banner exists
+    // to prevent.
+    const viewing = !$("chat-viewing-banner").hidden;
+    input.disabled = viewing;
+    submitBtn.disabled = viewing;
+    if (!viewing) input.focus();
   }
 });
+
+// Read-only viewing state: openChat() shows a past conversation without
+// changing which session is actually live, so the composer must not look
+// like it will continue that conversation — the next message would in fact
+// go to whichever session IS active, against context the panel isn't
+// showing. setViewingPast(false) is the "back to live" state: composer
+// enabled, banner hidden.
+function setViewingPast(viewing) {
+  $("chat-input").disabled = viewing;
+  $("chat-form").querySelector('button[type="submit"]').disabled = viewing;
+  $("chat-viewing-banner").hidden = !viewing;
+}
 
 $("chat-new").addEventListener("click", async () => {
   await fetch("/api/chat/new", { method: "POST" });
   $("chat-log").innerHTML = "";
+  setViewingPast(false);
+  loadChatHistory();
+});
+
+// --- Chat history: list, open (read-only), and resume past conversations ---
+async function loadChatHistory() {
+  const list = document.getElementById('chat-history-list');
+  list.replaceChildren();
+  let rows = [];
+  try {
+    const r = await fetch('/api/chats');
+    if (!r.ok) throw new Error(r.status);
+    rows = await r.json();
+  } catch (e) {
+    const li = document.createElement('li');
+    li.textContent = 'Could not load past conversations.';
+    list.append(li);
+    return;
+  }
+  if (!rows.length) {
+    const li = document.createElement('li');
+    li.textContent = 'No saved conversations yet.';
+    list.append(li);
+    return;
+  }
+  for (const row of rows) {
+    const li = document.createElement('li');
+
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'chat-history-open';
+    open.textContent = row.title;               // text node, never innerHTML
+    open.addEventListener('click', () => openChat(row.id));
+
+    const meta = document.createElement('span');
+    meta.className = 'chat-history-meta';
+    meta.textContent = `${(row.updated_at || '').slice(0, 10)} · ${row.turns} turns`;
+
+    const cont = document.createElement('button');
+    cont.type = 'button';
+    cont.className = 'chat-history-continue';
+    cont.textContent = 'Continue';
+    cont.addEventListener('click', () => resumeChat(row.id));
+
+    li.append(open, meta, cont);
+    list.append(li);
+  }
+}
+
+async function openChat(id) {
+  const r = await fetch(`/api/chats/${encodeURIComponent(id)}`);
+  if (!r.ok) return;
+  const chat = await r.json();
+  $("chat-log").replaceChildren();
+  const bubbles = [];
+  for (const m of chat.messages) {
+    if (typeof m.content === "string") {
+      bubbles.push(addMsg(m.role === "user" ? "user" : "analyst", m.content));
+      continue;
+    }
+    for (const b of m.content) {
+      if (b.type === "text") bubbles.push(addMsg("analyst", b.text));
+      else if (b.type === "tool_use") addMsg("tool", `called ${b.name}`);
+      // tool_result blocks are not rendered: the JSON payload is provenance
+      // for the transcript file, not something to read in the panel.
+    }
+  }
+  // Same treatment a live reply gets once its stream ends (app.js:316), so a
+  // reopened conversation shows names and sectors like a fresh one.
+  for (const b of bubbles) b.replaceChildren(annotate(b.textContent));
+  // Read-only by design: no server state changed, so the composer must not
+  // suggest that typing here continues this conversation.
+  setViewingPast(true);
+}
+
+async function resumeChat(id) {
+  const r = await fetch(`/api/chats/${encodeURIComponent(id)}/resume`,
+                        { method: "POST" });
+  if (!r.ok) return;
+  await openChat(id);
+  // openChat() just disabled the composer for read-only viewing; resuming
+  // makes this conversation the live one again, so re-enable it.
+  setViewingPast(false);
+}
+
+$("chat-history-toggle").addEventListener("click", () => {
+  const list = $("chat-history-list");
+  list.hidden = !list.hidden;
+  $("chat-history-toggle").textContent = list.hidden ? "Show" : "Hide";
 });
 
 // --- Refresh ---
@@ -341,4 +461,11 @@ $("refresh-btn").addEventListener("click", async () => {
   }
 });
 
+// Sessions live server-side, so a page load would otherwise inherit whatever
+// conversation the server still held from the last sitting. Opening the
+// dashboard always starts a fresh chat.
+(async () => {
+  await fetch("/api/chat/new", { method: "POST" });
+  await loadChatHistory();
+})();
 loadData();

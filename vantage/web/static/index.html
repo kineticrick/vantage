@@ -23,7 +23,17 @@
     <aside class="chat-col">
       <div class="chat-head"><span>Analyst</span>
         <button id="chat-new">New conversation</button></div>
+      <div id="chat-history">
+        <div class="chat-history-head">
+          <span>Past conversations</span>
+          <button id="chat-history-toggle" type="button">Show</button>
+        </div>
+        <ul id="chat-history-list" hidden></ul>
+      </div>
       <div id="chat-log" class="chat-log"></div>
+      <div id="chat-viewing-banner" class="chat-viewing-banner" hidden>
+        Viewing a past conversation — press Continue to keep talking
+      </div>
       <form id="chat-form" class="chat-form">
         <textarea id="chat-input" rows="2" placeholder="Ask the analyst…"></textarea>
         <button type="submit">Send</button>
